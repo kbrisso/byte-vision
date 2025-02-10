@@ -1,13 +1,12 @@
 import 'react';
-import {Outlet, Link} from "react-router-dom";
+import {Link, Outlet} from "react-router-dom";
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap/js/dist/tooltip.js'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 
 const Layout = () => {
 
-    return (
-        <>
+    return (<>
             <div className="container-fluid">
                 <div className="d-flex">
                     <div className="p2">
@@ -16,13 +15,18 @@ const Layout = () => {
                                 &nbsp;
                             </li>
                             <li className="nav-item">
-                                <Link to="/"><i data-bs-toggle="tooltip" data-bs-placement="right" title="Home" className="bi bi-house" style={{fontSize: "2rem"}}></i></Link>
+                                <Link to="/"><i data-bs-toggle="tooltip" data-bs-placement="right" title="Home"
+                                                className="bi bi-house" style={{fontSize: "2rem"}}></i></Link>
                             </li>
                             <li className="nav-item">
-                                <Link to="/Settings"><i data-bs-toggle="tooltip" data-bs-placement="right" title="Settings" className="bi bi-gear" style={{fontSize: "2rem"}}></i></Link>
+                                <Link to="/Settings"><i data-bs-toggle="tooltip" data-bs-placement="right"
+                                                        title="Settings" className="bi bi-gear"
+                                                        style={{fontSize: "2rem"}}></i></Link>
                             </li>
                             <li className="nav-item">
-                                <i className="bi bi-floppy" style={{fontSize: "2rem"}}></i>
+                                <Link to="/EmbedSettings"><i data-bs-toggle="tooltip" data-bs-placement="right"
+                                                             title="EmbedSettings" className="bi bi-file-earmark-binary"
+                                                             style={{fontSize: "2rem"}}></i></Link>
                             </li>
                         </ul>
                     </div>
@@ -32,8 +36,7 @@ const Layout = () => {
                     <div className="p-2 flex-column" style={{width: "260px"}}></div>
                 </div>
             </div>
-        </>
-    );
+        </>);
 };
 
 export default Layout;

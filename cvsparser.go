@@ -45,12 +45,11 @@ func (c *CSVLoader) Load(ctx context.Context) ([]Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	documents, err := c.readCSV()
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInternal, err)
+		Log.Error(err.Error())
+		return nil, err
 	}
-
 	return documents, nil
 }
 
@@ -62,11 +61,12 @@ func (c *CSVLoader) LoadFromSource(ctx context.Context, source string) ([]Docume
 func (c *CSVLoader) validate() error {
 	fileStat, err := os.Stat(c.filename)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInternal, err)
+		Log.Error(err.Error())
+		return err
 	}
 
 	if fileStat.IsDir() {
-		return fmt.Errorf("%w: %w", ErrInternal, os.ErrNotExist)
+		return fmt.Errorf("%w: %w", "Is directory", os.ErrNotExist)
 	}
 
 	return nil
@@ -75,7 +75,7 @@ func (c *CSVLoader) validate() error {
 func (c *CSVLoader) readCSV() ([]Document, error) {
 	csvFile, err := os.Open(c.filename)
 	if err != nil {
-		fmt.Errorf(err.Error())
+		Log.Error(err.Error())
 	}
 	defer csvFile.Close()
 

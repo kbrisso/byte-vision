@@ -5,10 +5,6 @@ import (
 	"os"
 )
 
-var (
-	ErrInternal = fmt.Errorf("internal error")
-)
-
 type TextSplitterLoader interface {
 	SplitDocuments(documents []Document) []Document
 }
@@ -20,11 +16,11 @@ type Loader struct {
 func isFile(filename string) error {
 	fileStat, err := os.Stat(filename)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInternal, err)
+		Log.Error(err.Error())
 	}
 
 	if fileStat.IsDir() {
-		return fmt.Errorf("%w: %w", ErrInternal, os.ErrNotExist)
+		return fmt.Errorf("%w: %w", "File is directory", os.ErrNotExist)
 	}
 
 	return nil

@@ -8,8 +8,7 @@ import (
 
 var llamaCppSanitizeRegexp = regexp.MustCompile(`\[.*?\]`)
 
-func CompletionPromptFromFile(ctx context.Context, args []string) ([]byte, error) {
-
+func GenerateCompletionWithCancel(ctx context.Context, args []string) ([]byte, error) {
 	// Create a child context with cancel
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -22,38 +21,7 @@ func CompletionPromptFromFile(ctx context.Context, args []string) ([]byte, error
 
 	// Run the command in a goroutine
 	go func() {
-		out, err := exec.CommandContext(ctx, LLamaCppPath, args...).Output()
-		result <- struct {
-			output []byte
-			err    error
-		}{output: out, err: err}
-		close(result)
-	}()
-
-	select {
-	case res := <-result:
-		// Command completed
-		return res.output, res.err
-	case <-ctx.Done():
-		// Context was canceled or timed out
-		return nil, ctx.Err()
-	}
-
-}
-func executeWithCancel(ctx context.Context, args []string) ([]byte, error) {
-	// Create a child context with cancel
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// Create a channel to capture the result
-	result := make(chan struct {
-		output []byte
-		err    error
-	})
-
-	// Run the command in a goroutine
-	go func() {
-		out, err := exec.CommandContext(ctx, LLamaCppPath, args...).Output()
+		out, err := exec.CommandContext(ctx, AppArgs.LLamaCliPath, args...).Output()
 		result <- struct {
 			output []byte
 			err    error

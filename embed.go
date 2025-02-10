@@ -4,15 +4,174 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/philippgille/chromem-go"
 	"math/rand"
+	"os"
 	"os/exec"
 	"runtime"
-	"strings"
+
 	"time"
 )
 
-func executeEmbedWithCancel(ctx context.Context, text string) ([]float32, error) {
+var CLI LlamaCppArgs
+var EMD LlamaEmbedArgs
+
+// EmbedCompletionWithCancel executes a series of operations including querying a database, generating embeddings,
+// Format -> tableName salary empNumber 10009 amount 94409 fromDate 2002-02-14 toDate 9999-01-01
+func QueryCSVEmbeddingWithCancel(ctx context.Context, cli LlamaCppArgs, emd LlamaEmbedArgs, dbFileName, reportTemplatePath, reportDataPath, whereKey string, queryField, queryValue string, tableList []string) ([]byte, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	CLI = cli
+	EMD = emd
+
+	db, err := chromem.NewPersistentDB(AppArgs.EmbedDBFolderName+dbFileName, false)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+
+	var out string
+	for _, table := range tableList {
+		where := make(map[string]string)
+		where[whereKey] = table
+		whereDocument := make(map[string]string)
+		whereDocument["$contains"] = fmt.Sprintf("%s %s", queryField, queryValue)
+		c, _ := db.GetOrCreateCollection(table, nil, GenerateEmbedWithCancel)
+		cnt := c.Count()
+		res, err := c.Query(ctx, fmt.Sprintf("%s %s", "tableName", table), cnt, where, whereDocument)
+		if err != nil {
+			Log.Error(err.Error())
+			return nil, err
+		}
+		for _, v := range res {
+			out += fmt.Sprintf("%s\r\n", v.Content)
+		}
+	}
+
+	// Open a file to write the output string
+	file, err := os.Create(AppArgs.ReportDataPath + reportDataPath)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			Log.Error(err.Error())
+		}
+	}(file)
+
+	// Write the output string to the file
+	_, err = file.WriteString(out)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+	reportPrompt := CreateReportTemplateWithMetadata(reportTemplatePath, reportDataPath)
+
+	file, err = os.Create(CLI.PromptFileVal)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			Log.Error(err.Error())
+		}
+	}(file)
+
+	// Write the output string to the file
+	_, err = file.WriteString(reportPrompt)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+	args := LlamaCliStructToArgs(CLI)
+	p, err := GenerateCompletionWithCancel(ctx, args)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+
+	return p, nil
+}
+func QueryTextEmbeddingWithCancel(ctx context.Context, cli LlamaCppArgs, emd LlamaEmbedArgs, dbFileName string, collection string, key string, metaText string, query string) ([]byte, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	CLI = cli
+	EMD = emd
+
+	db, err := chromem.NewPersistentDB(AppArgs.EmbedDBFolderName+dbFileName, false)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+	metaData := make(map[string]string)
+	metaData[key] = metaText
+
+	c, _ := db.GetOrCreateCollection(collection, nil, GenerateEmbedWithCancel)
+	cnt := c.Count()
+	if cnt >= 100 {
+		cnt = 100 / 3
+	}
+	res, err := c.Query(ctx, query, cnt, metaData, nil)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+	var out string
+	for _, v := range res {
+		out += fmt.Sprintf("%s\r\n", v.Content)
+	}
+
+	resStr := fmt.Sprintf("%v", strings.TrimSpace(out))
+	Log.Info(strconv.Itoa(len(resStr)))
+	CLI.PromptText = CreateLlamaTemplate(resStr)
+	args := LlamaCliStructToArgs(CLI)
+	// Write the output string to the file
+
+	p, err := GenerateCompletionWithCancel(ctx, args)
+	if err != nil {
+		Log.Error(err.Error())
+		return nil, err
+	}
+
+	return p, nil
+}
+func parseJSONToFloat32(jsonBytes []byte) []float32 {
+	const errMessage = "Error decoding JSON"
+
+	// Parse JSON into a 2D slice of float32
+	var nestedSlices [][]float32
+	if err := json.Unmarshal(jsonBytes, &nestedSlices); err != nil {
+		Log.Info(err.Error())
+		return nil
+	}
+
+	// Flatten the nested slices into a single slice
+	return flattenFloat32Slices(nestedSlices)
+}
+
+// Helper function to flatten 2D slices into a single slice
+func flattenFloat32Slices(nested [][]float32) []float32 {
+	var flatData []float32
+	for _, row := range nested {
+		flatData = append(flatData, row...)
+	}
+	return flatData
+}
+
+// GenerateEmbedWithCancel generates embeddings for a given text, supporting cancellation via context.
+// Takes a context and a string input; returns an embedding slice or an error upon failure.
+// Cancels the operation if the context is done or the timeout is reached.
+// Executes an external embedding command asynchronously, gathering the result or handling cancellation.
+func GenerateEmbedWithCancel(ctx context.Context, text string) ([]float32, error) {
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	// Create a channel to capture the result
@@ -20,11 +179,12 @@ func executeEmbedWithCancel(ctx context.Context, text string) ([]float32, error)
 		output []byte
 		err    error
 	})
-	args := EmbedArgs()
-	args = append(args, "-p", text)
+	EMD.EmbedPromptCmd = "-p"
+	EMD.EmbedPromptText = text
+	args := LlamaEmbedStructToArgs(EMD)
 	// Run the command in a goroutine
 	go func() {
-		out, err := exec.CommandContext(ctx, EmbedLLamaCppPath, args...).Output()
+		out, err := exec.CommandContext(ctx, AppArgs.LLamaEmbedCliPath, args...).Output()
 		result <- struct {
 			output []byte
 			err    error
@@ -35,7 +195,7 @@ func executeEmbedWithCancel(ctx context.Context, text string) ([]float32, error)
 	select {
 	case res := <-result:
 		// Command completed
-		return uint8Float32(res.output), res.err
+		return parseJSONToFloat32(res.output), res.err
 	case <-ctx.Done():
 		// Context was canceled or timed out
 		return nil, ctx.Err()
@@ -43,103 +203,24 @@ func executeEmbedWithCancel(ctx context.Context, text string) ([]float32, error)
 
 }
 
-func uint8Float32(input []byte) []float32 {
-	var parsedData [][]float32
-	// Unmarshal the JSON into the placeholder
-	err := json.Unmarshal([]byte(input), &parsedData)
-	if err != nil {
-		fmt.Println("Error decoding JSON:", err)
-		return nil
-	}
-
-	// Flatten the 2D array into a single []float32
-	var flatData []float32
-	for _, row := range parsedData {
-		flatData = append(flatData, row...)
-	}
-	return flatData
-}
-
-func EmbedCompletionsWithCancel(ctx context.Context, args []string) ([]byte, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	db, err := chromem.NewPersistentDB("C:/Projects/byte-vision/db/employee", false)
-	if err != nil {
-		Log.Error(err.Error())
-		return nil, err
-	}
-	c, err := db.GetOrCreateCollection("employee", nil, executeEmbedWithCancel)
-	if err != nil {
-		Log.Error(err.Error())
-		return nil, err
-	}
-	cnt := c.Count()
-	var tableList = []string{"salary", "employee", "title"}
-	var prompt string
-	var out string
-	for _, table := range tableList {
-		where := make(map[string]string)
-		where["table"] = table
-		res, err := c.Query(ctx, "empNumber 10009 ", cnt, where, map[string]string{"$contains": "10009"})
-		if err != nil {
-			Log.Error(err.Error())
-			return nil, err
-		}
-		for _, v := range res {
-			out += fmt.Sprintf("%s\n", v.Content)
-		}
-	}
-	prompt = fmt.Sprintf(`system You are a helpful assistant that follows instructions to answer questions.user please use the template shown between ### and >>> to build a report. Please use the data provided between context. List 
-                out the data in a table format with the appropriate headers.               
-				####Employee Report###
-				
-				####Employee Information###
-				| empNumber | firstName | lastName | birthDate   | gender | hireDate   |   |
-				|-----------|-----------|---------|------------|-------|------------|	
-				
-				---
-				
-				####Salary History####
-				| empNumber | firstName | lastName | birthDate   | gender | hireDate   | fromDate  | toDate    | amount  |
-				|-----------|-----------|---------|------------|-------|------------|-----------|-----------|---------|			
-				---
-				
-				####Title History####
-				| empNumber | firstName | lastName | birthDate   | gender | hireDate   | fromDate  | toDate    | title       |
-				|-----------|-----------|---------|------------|-------|------------|-----------|-----------|-------------|				
-				context starts %s context ends`, strings.TrimSpace(out))
-
-	fmt.Print(prompt)
-	// Create a new slice with enough capacity for the inserted items
-
-	p, err := executeWithCancel(ctx, args)
-	if err != nil {
-		Log.Error(err.Error())
-		return nil, err
-	}
-
-	return p, nil
-}
-
-func RunEmbedding() {
+func CreateEmbedding(doc []Document, dbPath string, collectionName string, metaData string, metaDataKey string) {
 	ctx := context.Background()
-	db, err := chromem.NewPersistentDB("C:/Projects/byte-vision/db/employee", false)
+	db, err := chromem.NewPersistentDB(AppArgs.EmbedDBFolderName+dbPath, false)
 	if err != nil {
 		Log.Error(err.Error())
 	}
-	c, err := db.GetOrCreateCollection("employee", nil, executeEmbedWithCancel)
+	c, err := db.GetOrCreateCollection(collectionName, nil, GenerateEmbedWithCancel)
 	if err != nil {
 		Log.Error(err.Error())
 	}
 	x := 0
-	doc := IngestTextData()
+
 	for _, singleDoc := range doc {
 		metadataStr := make(map[string]string)
 		for key, value := range singleDoc.Metadata {
 			if strValue, ok := value.(string); ok {
 				metadataStr[key] = strValue
-				metadataStr["table"] = "employee"
+				metadataStr[metaDataKey] = metaData
 			} else {
 				metadataStr[key] = fmt.Sprintf("%v", value) // Handle non-string values by converting to a string
 			}
@@ -161,20 +242,51 @@ func RunEmbedding() {
 		fmt.Println(x)
 	}
 }
-func IngestTextData() []Document {
+func IngestTextData(cli LlamaCppArgs, emd LlamaEmbedArgs, filePath string, dbPath string, chunkSize int, chunkOverlap int, collectionName string, metaData string, metaDataKey string) {
+	CLI = cli
+	EMD = emd
+	metaDataStr := Meta{}
+	metaDataStr[metaDataKey] = metaData
+	documents, _ := NewTextLoader(filePath, metaDataStr).Load(context.Background())
 
-	fmt.Printf("Ingesting data...")
-	metadataStr := Meta{}
-	metadataStr["text"] = "random"
-
-	documents, err := NewCSVLoader("C:/Projects/byte-vision/rag/emp.txt").Load(context.Background())
-	//documents, _ := NewTextLoader("C:/Projects/byte-vision/rag/random-test.txt", metadataStr).Load(context.Background())
-	if err != nil {
-		fmt.Println("Error:", err)
+	if chunkSize > 0 && chunkOverlap > 0 {
+		textSplitter := NewRecursiveCharacterTextSplitter(chunkSize, chunkOverlap)
+		documentChunks := textSplitter.SplitDocuments(documents)
+		CreateEmbedding(documentChunks, dbPath, collectionName, metaData, metaDataKey)
+	} else {
+		CreateEmbedding(documents, dbPath, collectionName, metaData, metaDataKey)
 	}
-	//textSplitter := NewRecursiveCharacterTextSplitter(53, 0)
-	//documentChunks := textSplitter.SplitDocuments(documents)
 
-	return documents
+}
+
+func IngestCVSData(cli LlamaCppArgs, emd LlamaEmbedArgs, filePath string, dbFolder string, chunkSize int, chunkOverlap int, collectionName string, metaData string, metaDataKey string) {
+	CLI = cli
+	EMD = emd
+
+	documents, _ := NewCSVLoader(filePath).Load(context.Background())
+
+	if chunkSize > 0 && chunkOverlap > 0 {
+		textSplitter := NewRecursiveCharacterTextSplitter(chunkSize, chunkOverlap)
+		documentChunks := textSplitter.SplitDocuments(documents)
+		CreateEmbedding(documentChunks, dbFolder, collectionName, metaData, metaDataKey)
+	} else {
+		CreateEmbedding(documents, dbFolder, collectionName, metaData, metaDataKey)
+	}
+
+}
+
+func IngestPdfData(cli LlamaCppArgs, emd LlamaEmbedArgs, filePath string, dbFolder string, chunkSize int, chunkOverlap int, collectionName string, metaData string, metaDataKey string) {
+	CLI = cli
+	EMD = emd
+	loader := NewPDFToTextLoader(filePath).WithPDFToTextPath(AppArgs.PDFToTextEXE)
+	documents, _ := loader.Load(context.Background())
+
+	if chunkSize > 0 && chunkOverlap > 0 {
+		textSplitter := NewRecursiveCharacterTextSplitter(chunkSize, chunkOverlap)
+		documentChunks := textSplitter.SplitDocuments(documents)
+		CreateEmbedding(documentChunks, dbFolder, collectionName, metaData, metaDataKey)
+	} else {
+		CreateEmbedding(documents, dbFolder, collectionName, metaData, metaDataKey)
+	}
 
 }

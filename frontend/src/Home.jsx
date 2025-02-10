@@ -1,170 +1,115 @@
 import {Button, Card, Form, InputGroup} from "react-bootstrap";
 import {useEffect, useState} from "react";
-
-import {LogError, LogInfo} from "../wailsjs/runtime/runtime.js";
-import {DomGetDefaultSettings, GenerateCompletion, Embed, EmbedCompletion} from "../wailsjs/go/main/App.js";
-
-import {initialState, useSettings, useSettingsDispatch} from "./SettingsContextHooks.jsx";
+import {useNavigate} from "react-router-dom";
 
 
+import {GenerateCompletion} from "../wailsjs/go/main/App.js";
 
-const Home = () => {
+import {useLlamaCliSettings, useLlamaCliSettingsDispatch} from "./LlamaCliSettingsContextHooks.jsx";
+import {initState} from "./Common.jsx";
+
+
+
+export const  Home = () => {
     useEffect(() => {
-        DomGetDefaultSettings().then((settings) => {
-            initialState.ID = settings.ID
-            initialState.Description = settings.Description
-            initialState.PromptCmd.String = settings.PromptCmd.String
-            initialState.PromptCmdEnabled.Bool = settings.PromptCmdEnabled.Bool
-            initialState.ConversationCmd.String = settings.ConversationCmd.String
-            initialState.ConversationCmdEnabled.Bool = settings.ConversationCmdEnabled.Bool
-            initialState.ChatTemplateCmd.String = settings.ChatTemplateCmd.String
-            initialState.ChatTemplateVal.String = settings.ChatTemplateVal.String
-            initialState.MultilineInputCmd.String = settings.MultilineInputCmd.String
-            initialState.MultilineInputCmdEnabled.Bool = settings.MultilineInputCmdEnabled.Bool
-            initialState.CtxSizeCmd.String = settings.CtxSizeCmd.String
-            initialState.CtxSizeVal.String = settings.CtxSizeVal.String
-            initialState.RopeScaleVal.String = settings.RopeScaleVal.String
-            initialState.RopeScaleCmd.String = settings.RopeScaleCmd.String
-            initialState.PromptCacheCmd.String = settings.PromptCacheCmd.String
-            initialState.PromptCacheVal.String = settings.PromptCacheVal.String
-            initialState.PromptFileCmd.String = settings.PromptFileCmd.String
-            initialState.PromptFileVal.String = settings.PromptFileVal.String
-            initialState.InteractiveFirstCmd.String = settings.InteractiveFirstCmd.String
-            initialState.InteractiveFirstCmdEnabled.Bool = settings.InteractiveFirstCmdEnabled.Bool
-            initialState.InteractiveModeCmd.String = settings.InteractiveModeCmd.String
-            initialState.InteractiveModeCmdEnabled.Bool = settings.InteractiveModeCmdEnabled.Bool
-            initialState.ReversePromptCmd.String = settings.ReversePromptCmd.String
-            initialState.ReversePromptVal.String = settings.ReversePromptVal.String
-            initialState.InPrefixCmd.String = settings.InPrefixCmd.String
-            initialState.InPrefixVal.String = settings.InPrefixVal.String
-            initialState.InSuffixCmd.String = settings.InSuffixCmd.String
-            initialState.InSuffixVal.String = settings.InSuffixVal.String
-            initialState.GPULayersCmd.String = settings.GPULayersCmd.String
-            initialState.GPULayersVal.String = settings.GPULayersVal.String
-            initialState.ThreadsBatchCmd.String = settings.ThreadsBatchCmd.String
-            initialState.ThreadsBatchVal.String = settings.ThreadsBatchVal.String
-            initialState.ThreadsCmd.String = settings.ThreadsCmd.String
-            initialState.ThreadsVal.String = settings.ThreadsVal.String
-            initialState.KeepCmd.String = settings.KeepCmd.String
-            initialState.KeepVal.String = settings.KeepVal.String
-            initialState.TopKCmd.String = settings.TopKCmd.String
-            initialState.TopKVal.String = settings.TopKVal.String
-            initialState.MainGPUCmd.String = settings.MainGPUCmd.String
-            initialState.MainGPUVal.String = settings.MainGPUVal.String
-            initialState.RepeatPenaltyCmd.String = settings.RepeatPenaltyCmd.String
-            initialState.RepeatPenaltyVal.String = settings.RepeatPenaltyVal.String
-            initialState.RepeatLastPenaltyCmd.String = settings.RepeatLastPenaltyCmd.String
-            initialState.RepeatLastPenaltyVal.String = settings.RepeatLastPenaltyVal.String
-            initialState.MemLockCmd.String = settings.MemLockCmd.String
-            initialState.MemLockCmdEnabled.Bool = settings.MemLockCmdEnabled.Bool
-            initialState.EscapeNewLinesCmd.String = settings.EscapeNewLinesCmd.String
-            initialState.EscapeNewLinesCmdEnabled.Bool = settings.EscapeNewLinesCmdEnabled.Bool
-            initialState.LogVerboseCmd.String = settings.LogVerboseCmd.String
-            initialState.LogVerboseEnabled.Bool = settings.LogVerboseEnabled.Bool
-            initialState.TemperatureVal.String = settings.TemperatureVal.String
-            initialState.TemperatureCmd.String = settings.TemperatureCmd.String
-            initialState.PredictCmd.String = settings.PredictCmd.String
-            initialState.PredictVal.String = settings.PredictVal.String
-            initialState.ModelFullPath.String = settings.ModelFullPath.String
-            initialState.ModelCmd.String = settings.ModelCmd.String
-            initialState.PromptText.String = settings.PromptText.String
-            initialState.NoDisplayPromptCmd.String = settings.NoDisplayPromptCmd.String
-            initialState.NoDisplayPromptEnabled.Bool = settings.NoDisplayPromptEnabled.Bool
-            initialState.TopPCmd.String = settings.TopPCmd.String
-            initialState.TopPVal.String = settings.TopPVal.String
-            initialState.LogFileCmd.String = settings.LogFileCmd.String
-            initialState.LogFileVal.String = settings.LogFileVal.String
-        }).catch(err => {
-            LogError(err);
-        });
-    }, []);
+        (async () => {
+            await initState();
+        })();
+        } , []);
 
     const [out, setOut] = useState("");
-    const state = useSettings();
-    const dispatch = useSettingsDispatch();
+    const cliState = useLlamaCliSettings();
+    const llamaCliDispatch = useLlamaCliSettingsDispatch();
+    const navigate = useNavigate();
 
+    const handleClick = () => {
+        navigate('/Settings'); // Replace '/about' with the desired path
+    };
 
-    // Handler to update a field
     const handleChange = (field, value) => {
-        dispatch({
+        llamaCliDispatch({
             type: "SET_FIELD", field, value,
         });
     };
 
-    const embed = () => {
-        Embed().then((val) => {
-            LogInfo(val);
-        });
-
-    }
-
-    const embedCompletion = () => {
-        EmbedCompletion(state).then((val) => {
-            setOut(val);
-        });
-
-    }
-
     const handleSubmit = (event) => {
         event.preventDefault();
-        GenerateCompletion(state).then((val) => {
+        GenerateCompletion(cliState).then((val) => {
             setOut(val);
-         });
+        });
     }
     return (
         <>
-            <div className="d-flex vh-100 overflow-y-scroll"><p style={{whiteSpace:"pre-wrap"}} className="font-monospace fw-medium lh-small">{out}</p></div>
-            <form onSubmit={handleSubmit}>
-            <div className="d-flex p-2 flex-column justify-content-end">
-                <Card className="w-100 rounded shadow-lg">
-                    <Card.Body>
-                        <span className="badge">Query</span>
-                        <InputGroup hasValidation>
-                            <Form.Control
-                                required
-                                as="textarea"
-                                rows={10}
-                                value={state.PromptText.String}
-                                id="PromptText"
-                                name="PromptText"
-                                className="form-control"
-                                maxLength={50000}
-                                minLength={1}
-                                aria-label=""
-                                aria-describedby="button-addon2"
-                                onChange={(e) => handleChange("PromptText", {
-                                    ...state.PromptText.String, String: e.target.value,
-                                })}
-                            />
-                            <Button
-
-                                variant="btn btn-primary"
-                                type="submit"
-                                id="submit"
-                            >
-                                <i className="bi bi-search"></i>
-                            </Button>
-
-                        </InputGroup>
-                        <div className="pt-2">
-                            <Button
-                                onClick={embedCompletion}
-                                type="button"
-                                variant="btn btn-primary float-end"
-                            >
-                                Embed Completion
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="btn btn-primary float-end"
-                                onClick={embed}
-                            >
-                                Embed
-                            </Button>
-                        </div>
-                    </Card.Body>
-                </Card>
+            <div className="d-flex vh-100 overflow-y-scroll"><p style={{whiteSpace: "pre-wrap"}}
+                                                                className="font-monospace fw-medium lh-small">{out}</p>
             </div>
+            <form onSubmit={handleSubmit}>
+                <div className="d-flex p-2 flex-column justify-content-end">
+                    <Card className="w-100 rounded shadow-lg">
+                        <Card.Body>
+                            <span className="badge">Query</span>
+                            <InputGroup hasValidation>
+                                <Form.Control
+                                    required
+                                    as="textarea"
+                                    rows={10}
+                                    value={cliState.PromptText}
+                                    id="PromptText"
+                                    name="promptText"
+                                    className="form-control"
+                                    maxLength={50000}
+                                    minLength={1}
+                                    aria-label=""
+                                    aria-describedby="button-addon2"
+                                    onChange={(e) => handleChange("PromptText", e.target.value)}
+                                />
+                                <Button
+                                    variant="btn btn-primary"
+                                    type="submit"
+                                    id="submit"
+                                >
+                                    <i className="bi bi-search"></i>
+                                </Button>
+
+                            </InputGroup>
+                            <div className="pt-2">
+                                <div className="d-flex flex-row mb-3 align-items-center">
+                                    <div className="p-2 flex-fill">
+                                        <label htmlFor="filePath" className="form-label float-start pe-2">Choose prompt
+                                            type:</label>
+                                        <select className="w-auto input-group-sm">
+                                            <option value="pdf">PDF</option>
+                                            <option value="text">Text</option>
+                                            <option value="text">CSV</option>
+                                        </select>
+                                    </div>
+                                    <div className="p-2 flex-fill">
+                                        <label htmlFor="filePath" className="form-label float-start pe-2">Current
+                                            llama-cli
+                                            settings:</label>
+                                        <input
+                                            type="text"
+                                            id="description"
+                                            name="description"
+                                            value={cliState.Description}
+                                            className="w-50 input-group-sm"
+                                        />
+                                    </div>
+                                    <div className="p-2 flex-fill">
+                                        <Button
+                                            variant="btn btn-primary float-start"
+                                            type="submit"
+                                            id="submit"
+                                            onClick={handleClick}
+                                        >
+                                            Change settings
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card.Body>
+                    </Card>
+                </div>
             </form>
         </>
     );

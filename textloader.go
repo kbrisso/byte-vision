@@ -40,23 +40,19 @@ func (t *TextLoader) Load(ctx context.Context) ([]Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	text, err := os.ReadFile(t.filename)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInternal, err)
+		Log.Error(err.Error())
 	}
-
 	documents := []Document{
 		{
 			Content:  string(text),
 			Metadata: t.metadata,
 		},
 	}
-
 	if t.loader.textSplitter != nil {
 		documents = t.loader.textSplitter.SplitDocuments(documents)
 	}
-
 	return documents, nil
 }
 
@@ -71,19 +67,17 @@ func (t *TextLoader) validate() error {
 	} else {
 		_, ok := t.metadata[SourceMetadataKey]
 		if ok {
-			return fmt.Errorf("%w: metadata key %s is reserved", ErrInternal, SourceMetadataKey)
+			return fmt.Errorf("%w: metadata key %s is reserved", "ErrInternal", SourceMetadataKey)
 		}
 	}
-
 	t.metadata[SourceMetadataKey] = t.filename
-
 	fileStat, err := os.Stat(t.filename)
 	if err != nil {
-		return fmt.Errorf("%w: %w", ErrInternal, err)
+		return fmt.Errorf("%w: %w", "ErrInternal", err)
 	}
 
 	if fileStat.IsDir() {
-		return fmt.Errorf("%w: %w", ErrInternal, os.ErrNotExist)
+		return fmt.Errorf("%w: %w", "ErrInternal", os.ErrNotExist)
 	}
 
 	return nil

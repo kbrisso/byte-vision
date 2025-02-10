@@ -8,25 +8,22 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/logger"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"os"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 var Log logger.Logger
-var ModelPath string
-var LogPath string
-var LLamaCppPath string
-var EmbedLLamaCppPath string
+var DefaultLlamaCliArgs LlamaCppArgs
+var DefaultLlamaEmbedArgs LlamaEmbedArgs
+var AppArgs DefaultAppArgs
 
 func main() {
 	_ = godotenv.Load("byte-vision-cfg.env")
-	ModelPath = os.Getenv("ModelPath")
-	LogPath = os.Getenv("LogPath")
-	LLamaCppPath = os.Getenv("LLamaCppPath")
-	EmbedLLamaCppPath = os.Getenv("EmbedLLamaCppPath")
+	DefaultLlamaCliArgs = ParseDefaultLlamaCliEnv()
+	DefaultLlamaEmbedArgs = ParseDefaultLlamaEmbedEnv()
+	AppArgs = ParseDefaultAppEnv()
 
-	Log = logger.NewFileLogger(fmt.Sprintf(LogPath))
+	Log = logger.NewFileLogger(fmt.Sprintf(AppArgs.AppLogPath + AppArgs.AppLogFileName))
 
 	// Create an instance of the app structure
 	app := NewApp()
