@@ -2,41 +2,53 @@ import React, {useEffect, useState} from 'react';
 
 
 import {GetModelFiles} from "../wailsjs/go/main/App.js";
-import {LogInfo} from "../wailsjs/runtime/runtime.js";
+import {LogError, LogInfo} from "../wailsjs/runtime/runtime.js";
 
 import {useLlamaEmbedSettingsDispatch} from "./LlamaEmbedSettingsContextHooks.jsx";
 
 
+
 export const LlamaEmbedSettingsForm = ({embedState, appState = {}}) => {
 
-    const dispatch = useLlamaEmbedSettingsDispatch(); // Dispatch updates
+    const embedSettingsDispatch = useLlamaEmbedSettingsDispatch(); // Dispatch updates
     const [models, setModels] = useState([]); // To store the list of models
     const [selectedModel, setSelectedModel] = useState(""); // To store the selec
     const [errors, setErrors] = useState({});
 
 
     useEffect(() => {
-        if (models.length === 0) {
-            GetModelFiles().then((result) => {
-                result.forEach((item) => {
-                    models.push({id: item.FullPath, ModelName: item.FileName, FullPath: item.FullPath});
-                });
-                setModels(models);
-                const selectedId = appState.ModelFolderName.replace(/\//g, "\\") + appState.EmbedModelFileName;
-                const selected = models.find(item => item.id === selectedId)?.FullPath;
-                const modelName = models.find(item => item.id === selectedId)?.ModelName;
-                let value  = appState.AppLogPath + (modelName + ".log");
-                dispatch({
-                    type: "SET_FIELD", field:"EmbedModelLogFileNameVal", value,
-                });
-                setSelectedModel(selected);
-            },);
-        }
+     let selectedId = "";
+        (async () => {
+            if (models.length === 0) {
+                GetModelFiles().then((result) => {
+                    result.forEach((item) => {
+                        models.push({id: item.FullPath, ModelName: item.FileName, FullPath: item.FullPath});
+                    });
+                    setModels(models);
+                    if (embedState.ModelFullPath.length) {
+                        selectedId = embedState.ModelFullPath;
+                    }else {
+                        selectedId = appState.ModelFolderName.replace(/\//g, "\\") + appState.EmbedModelFileName;
+                    }
+                    const selected = models.find(item => item.id === selectedId)?.FullPath;
+                    const modelName = models.find(item => item.id === selectedId)?.ModelName;
+                    let value  = appState.AppLogPath + (modelName + ".log");
+                    embedSettingsDispatch({
+                        type: "SET_FIELD", field:"EmbedModelLogFileNameVal", value,
+                    });
+                    embedSettingsDispatch({
+                        type: "SET_FIELD", field:"EmbedModelFullPath", selectedId,
+                    });
+                    setSelectedModel(selected);
+                },).catch((error) => {LogError(error)});
+            }
+        })();
+
     }, []);
 
     // Handler to update a field
     const handleChange = (field, value) => {
-        dispatch({
+        embedSettingsDispatch({
             type: "SET_FIELD", field, value,
         });
         validateField(field, value);
@@ -45,18 +57,18 @@ export const LlamaEmbedSettingsForm = ({embedState, appState = {}}) => {
         if (value.length) {
             if (appState.ModelLogFolderNamePath.length > value.length) {
                 value = appState.ModelLogFolderNamePath + value;
-                dispatch({
+                embedSettingsDispatch({
                     type: "SET_FIELD", field, value,
                 });
             }else{
                 value = value.substring(appState.ModelLogFolderNamePath.length, value.length);
                 value = appState.ModelLogFolderNamePath + value;
-                dispatch({
+                embedSettingsDispatch({
                     type: "SET_FIELD", field, value,
                 });
             }
         }else{
-            dispatch({
+            embedSettingsDispatch({
                 type: "SET_FIELD", field, value,
             });
         }
@@ -93,19 +105,19 @@ export const LlamaEmbedSettingsForm = ({embedState, appState = {}}) => {
 
         if (appState.ModelLogFolderNamePath.length < embedState.EmbedModelLogFileNameVal.length) {
             value = appState.ModelLogFolderNamePath + value;
-            dispatch({
+            embedSettingsDispatch({
                 type: "SET_FIELD", field:"EmbedModelLogFileNameVal", value,
             });
         }else{
             value = appState.ModelLogFolderNamePath.substring(appState.ModelLogFolderNamePath.length, value.length);
             value = appState.ModelLogFolderNamePath + value;
-            dispatch({
+            embedSettingsDispatch({
                 type: "SET_FIELD", field:"EmbedModelLogFileNameVal", value,
             });
         }
         setSelectedModel(selected);
         value = selectedId
-        dispatch({
+        embedSettingsDispatch({
             type: "SET_FIELD", field:"EmbedModelPathVal", value,
         });
     };
@@ -241,7 +253,7 @@ export const LlamaEmbedSettingsForm = ({embedState, appState = {}}) => {
                             </label>
                         </div>
                         <div className="d-flex flex-fill w-50 justify-content-start">
-                            <label className="pe-2">
+                            <label className="pe-1">
                                 Value:
                             </label>
                             <input className="input-group-sm"

@@ -1,12 +1,10 @@
-import React from 'react'
-import {createRoot} from 'react-dom/client'
+import 'react'
 
+
+import {initState} from "./Common.jsx";
 import App from './App'
 
-const container = document.getElementById('root')
 
-const root = createRoot(container)
+initState().then((root)=>{root.render(<App/>);}).catch()
 
-root.render(
-        <App/>
-);
+

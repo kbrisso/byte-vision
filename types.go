@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 )
 
@@ -12,7 +10,7 @@ func ParseDefaultLlamaCliEnv() LlamaCppArgs {
 	out := LlamaCppArgs{
 		Description:              os.Getenv("Description"),
 		ModelCmd:                 os.Getenv("ModelCmd"),
-		ModelFullPath:            cleanPath(os.Getenv("ModelFullPath")),
+		ModelFullPath:            os.Getenv("ModelFullPath"),
 		PromptCmd:                os.Getenv("PromptCmd"),
 		PromptCmdEnabled:         getEnvBool(os.Getenv("PromptCmdEnabled"), false),
 		PromptText:               os.Getenv("PromptText"),
@@ -28,9 +26,7 @@ func ParseDefaultLlamaCliEnv() LlamaCppArgs {
 		PromptCacheCmd:           os.Getenv("PromptCacheCmd"),
 		PromptCacheVal:           os.Getenv("PromptCacheVal"),
 		PromptFileCmd:            os.Getenv("PromptFileCmd"),
-		PromptFileVal:            cleanPath(os.Getenv("PromptFileVal")),
-		InteractiveFirstCmd:      os.Getenv("InteractiveFirstCmd"),
-		InteractiveModeCmd:       os.Getenv("InteractiveModeCmd"),
+		PromptFileVal:            os.Getenv("PromptFileVal"),
 		ReversePromptCmd:         os.Getenv("ReversePromptCmd"),
 		ReversePromptVal:         os.Getenv("ReversePromptVal"),
 		InPrefixCmd:              os.Getenv("InPrefixCmd"),
@@ -67,10 +63,10 @@ func ParseDefaultLlamaCliEnv() LlamaCppArgs {
 		NoDisplayPromptEnabled:   getEnvBool(os.Getenv("NoDisplayPromptEnabled"), false),
 		TopPCmd:                  os.Getenv("TopPCmd"),
 		TopPVal:                  os.Getenv("TopPVal"),
-		ModelLogFileCmd:          cleanPath(os.Getenv("ModelLogFileCmd")),
-		ModelLogFileNameVal:      cleanPath(os.Getenv("ModelLogFileNameVal")),
-		ConversationCmd:          os.Getenv("ConversationCmd"),
-		ConversationCmdEnabled:   getEnvBool(os.Getenv("ConversationCmdEnabled"), false),
+		MinPCmd:                  os.Getenv("MinPCmd"),
+		MinPVal:                  os.Getenv("MinPVal"),
+		ModelLogFileCmd:          os.Getenv("ModelLogFileCmd"),
+		ModelLogFileNameVal:      os.Getenv("ModelLogFileNameVal"),
 		FlashAttentionCmd:        os.Getenv("FlashAttentionCmd"),
 		FlashAttentionCmdEnabled: getEnvBool(os.Getenv("FlashAttentionCmdEnabled"), false),
 	}
@@ -92,10 +88,10 @@ func ParseDefaultLlamaEmbedEnv() LlamaEmbedArgs {
 		EmbedThreadsVal:               os.Getenv("EmbedThreadsVal"),
 		EmbedSeparatorCmd:             os.Getenv("EmbedSeparatorCmd"),
 		EmbedSeparatorVal:             os.Getenv("EmbedSeparatorVal"),
-		EmbedModelLogFileCmd:          cleanPath(os.Getenv("EmbedModelLogFileCmd")),
+		EmbedModelLogFileCmd:          os.Getenv("EmbedModelLogFileCmd"),
 		EmbedModelLogFileNameVal:      os.Getenv("EmbedModelLogFileNameVal"),
-		EmbedModelPathVal:             cleanPath(os.Getenv("EmbedModelPathVal")),
-		EmbedModelPathCmd:             cleanPath(os.Getenv("EmbedModelPathCmd")),
+		EmbedModelPathVal:             os.Getenv("EmbedModelPathVal"),
+		EmbedModelPathCmd:             os.Getenv("EmbedModelPathCmd"),
 		EmbedNormalizeCmd:             os.Getenv("EmbedNormalizeCmd"),
 		EmbedNormalizeVal:             os.Getenv("EmbedNormalizeVal"),
 		EmbedMainGPUCmd:               os.Getenv("EmbedMainGPUCmd"),
@@ -105,7 +101,7 @@ func ParseDefaultLlamaEmbedEnv() LlamaEmbedArgs {
 		EmbedTopKCmd:                  os.Getenv("EmbedTopKCmd"),
 		EmbedTopKVal:                  os.Getenv("EmbedTopKVal"),
 		EmbedPromptFileCmd:            os.Getenv("EmbedPromptFileCmd"),
-		EmbedPromptFileVal:            cleanPath(os.Getenv("EmbedPromptFileVal")),
+		EmbedPromptFileVal:            os.Getenv("EmbedPromptFileVal"),
 		EmbedPromptCmd:                os.Getenv("EmbedPromptCmd"),
 		EmbedFlashAttentionCmdEnabled: getEnvBool(os.Getenv("EmbedFlashAttentionCmdEnabled"), false),
 		EmbedFlashAttentionCmd:        os.Getenv("EmbedFlashAttentionCmd"),
@@ -122,20 +118,21 @@ func ParseDefaultLlamaEmbedEnv() LlamaEmbedArgs {
 
 func ParseDefaultAppEnv() DefaultAppArgs {
 	out := DefaultAppArgs{
-		ModelPath:                cleanPath(os.Getenv("ModelPath")),
-		AppLogPath:               cleanPath(os.Getenv("AppLogPath")),
+		ModelPath:                os.Getenv("ModelPath"),
+		AppLogPath:               os.Getenv("AppLogPath"),
 		AppLogFileName:           os.Getenv("AppLogFileName"),
-		PromptTemplateFolderName: cleanPath(os.Getenv("PromptTemplateFolderName")),
+		PromptTemplateFolderName: os.Getenv("PromptTemplateFolderName"),
 		ModelFolderName:          os.Getenv("ModelFolderName"),
-		LLamaCliPath:             cleanPath(os.Getenv("LLamaCliPath")),
-		LLamaEmbedCliPath:        cleanPath(os.Getenv("LLamaEmbedCliPath")),
-		PDFToTextEXE:             cleanPath(os.Getenv("PDFToTextEXE")),
+		LLamaCliPath:             os.Getenv("LLamaCliPath"),
+		LLamaEmbedCliPath:        os.Getenv("LLamaEmbedCliPath"),
+		PDFToTextEXE:             os.Getenv("PDFToTextEXE"),
 		ModelLogFolderNamePath:   os.Getenv("ModelLogFolderNamePath"),
 		EmbedDBFolderName:        os.Getenv("EmbedDBFolderName"),
 		EmbedModelFileName:       os.Getenv("EmbedModelFileName"),
 		ModelFileName:            os.Getenv("ModelFileName"),
-		ReportDataPath:           cleanPath(os.Getenv("ReportDataPath")),
-		PromptCacheFolderName:    cleanPath(os.Getenv("PromptCacheFolderName")),
+		ReportDataPath:           os.Getenv("ReportDataPath"),
+		PromptCacheFolderName:    os.Getenv("PromptCacheFolderName"),
+		AppDBFullPath:            os.Getenv("AppDBFullPath"),
 	}
 	return out
 }
@@ -147,11 +144,6 @@ func getEnvBool(key string, fallback bool) bool {
 	}
 
 	return result
-}
-func cleanPath(path string) string {
-	filepath.Clean(path)
-	return fmt.Sprintf("%s%s", path, "\\")
-
 }
 
 func LlamaCliStructToArgs(args LlamaCppArgs) []string {
@@ -173,14 +165,11 @@ func LlamaCliStructToArgs(args LlamaCppArgs) []string {
 	addCmdValPair(args.ModelCmd, args.ModelFullPath)
 	addCmdValPair(args.PromptCmd, args.PromptText)
 	addCmdValPair(args.ChatTemplateCmd, args.ChatTemplateVal)
-	addCmdBoolPair(args.ConversationCmd, args.ConversationCmdEnabled)
 	addCmdBoolPair(args.MultilineInputCmd, args.MultilineInputCmdEnabled)
 	addCmdValPair(args.CtxSizeCmd, args.CtxSizeVal)
 	addCmdValPair(args.RopeScaleCmd, args.RopeScaleVal)
 	addCmdValPair(args.PromptCacheCmd, args.PromptCacheVal)
 	addCmdValPair(args.PromptFileCmd, args.PromptFileVal)
-	addCmdBoolPair(args.InteractiveFirstCmd, args.InteractiveFirstCmdEnabled)
-	addCmdBoolPair(args.InteractiveModeCmd, args.InteractiveModeCmdEnabled)
 	addCmdValPair(args.ReversePromptCmd, args.ReversePromptVal)
 	addCmdValPair(args.InPrefixCmd, args.InPrefixVal)
 	addCmdValPair(args.InSuffixCmd, args.InSuffixVal)
@@ -199,6 +188,7 @@ func LlamaCliStructToArgs(args LlamaCppArgs) []string {
 	addCmdValPair(args.ModelLogFileCmd, args.ModelLogFileNameVal)
 	addCmdBoolPair(args.NoDisplayPromptCmd, args.NoDisplayPromptEnabled)
 	addCmdValPair(args.TopPCmd, args.TopPVal)
+	addCmdValPair(args.MinPCmd, args.MinPVal)
 	addCmdBoolPair(args.LogVerboseCmd, args.LogVerboseEnabled)
 	addCmdBoolPair(args.FlashAttentionCmd, args.FlashAttentionCmdEnabled)
 	return result
@@ -267,75 +257,71 @@ func DefaultAppStructToArgs(args DefaultAppArgs) []string {
 }
 
 type LlamaCppArgs struct {
-	ID                         string `json:"id"`
-	Description                string `json:"description"`
-	PromptCmd                  string `json:"promptCmd"`
-	PromptCmdEnabled           bool   `json:"promptCmdEnabled"`
-	ConversationCmd            string `json:"conversationCmd"`
-	ConversationCmdEnabled     bool   `json:"conversationCmdEnabled"`
-	ChatTemplateCmd            string `json:"chatTemplateCmd"`
-	ChatTemplateVal            string `json:"chatTemplateVal"`
-	MultilineInputCmd          string `json:"multilineInputCmd"`
-	MultilineInputCmdEnabled   bool   `json:"multilineInputCmdEnabled"`
-	CtxSizeCmd                 string `json:"ctxSizeCmd"`
-	CtxSizeVal                 string `json:"ctxSizeVal"`
-	RopeScaleVal               string `json:"ropeScaleVal"`
-	RopeScaleCmd               string `json:"ropeScaleCmd"`
-	PromptCacheAllCmd          string `json:"promptCacheAllCmd"`
-	PromptCacheAllEnabled      bool   `json:"promptCacheAllEnabled"`
-	PromptCacheCmd             string `json:"promptCacheCmd"`
-	PromptCacheVal             string `json:"promptCacheVal"`
-	PromptFileCmd              string `json:"promptFileCmd"`
-	PromptFileVal              string `json:"promptFileVal"`
-	InteractiveFirstCmd        string `json:"interactiveFirstCmd"`
-	InteractiveFirstCmdEnabled bool   `json:"interactiveFirstCmdEnabled"`
-	InteractiveModeCmdEnabled  bool   `json:"interactiveModeCmdEnabled"`
-	InteractiveModeCmd         string `json:"interactiveModeCmd"`
-	ReversePromptCmd           string `json:"reversePromptCmd"`
-	ReversePromptVal           string `json:"reversePromptVal"`
-	InPrefixCmd                string `json:"inPrefixCmd"`
-	InPrefixVal                string `json:"inPrefixVal"`
-	InSuffixCmd                string `json:"inSuffixCmd"`
-	InSuffixVal                string `json:"inSuffixVal"`
-	GPULayersCmd               string `json:"gPULayersCmd"`
-	GPULayersVal               string `json:"gPULayersVal"`
-	ThreadsBatchCmd            string `json:"threadsBatchCmd"`
-	ThreadsBatchVal            string `json:"threadsBatchVal"`
-	ThreadsCmd                 string `json:"threadsCmd"`
-	ThreadsVal                 string `json:"threadsVal"`
-	KeepCmd                    string `json:"keepCmd"`
-	KeepVal                    string `json:"keepVal"`
-	TopKCmd                    string `json:"topKCmd"`
-	TopKVal                    string `json:"topKVal"`
-	MainGPUCmd                 string `json:"mainGPUCmd"`
-	MainGPUVal                 string `json:"mainGPUVal"`
-	RepeatPenaltyCmd           string `json:"repeatPenaltyCmd"`
-	RepeatPenaltyVal           string `json:"repeatPenaltyVal"`
-	RepeatLastPenaltyCmd       string `json:"repeatLastPenaltyCmd"`
-	RepeatLastPenaltyVal       string `json:"repeatLastPenaltyVal"`
-	MemLockCmd                 string `json:"memLockCmd"`
-	MemLockCmdEnabled          bool   `json:"memLockCmdEnabled"`
-	NoMMApCmd                  string `json:"noMMApCmd"`
-	NoMMApCmdEnabled           bool   `json:"noMMApCmdEnabled"`
-	EscapeNewLinesCmd          string `json:"escapeNewLinesCmd"`
-	EscapeNewLinesCmdEnabled   bool   `json:"escapeNewLinesCmdEnabled"`
-	LogVerboseCmd              string `json:"logVerboseCmd"`
-	LogVerboseEnabled          bool   `json:"logVerboseEnabled"`
-	TemperatureVal             string `json:"temperatureVal"`
-	TemperatureCmd             string `json:"temperatureCmd"`
-	PredictCmd                 string `json:"predictCmd"`
-	PredictVal                 string `json:"predictVal"`
-	ModelFullPath              string `json:"modelFullPath"`
-	ModelCmd                   string `json:"modelCmd"`
-	PromptText                 string `json:"promptText"`
-	NoDisplayPromptCmd         string `json:"noDisplayPromptCmd"`
-	NoDisplayPromptEnabled     bool   `json:"noDisplayPromptEnabled"`
-	TopPCmd                    string `json:"topPCmd"`
-	TopPVal                    string `json:"topPVal"`
-	ModelLogFileCmd            string `json:"modelLogFileCmd"`
-	ModelLogFileNameVal        string `json:"modelLogFileNameVal"`
-	FlashAttentionCmd          string `json:"flashAttentionCmd"`
-	FlashAttentionCmdEnabled   bool   `json:"flashAttentionCmdEnabled"`
+	ID                       string `json:"id"`
+	Description              string `json:"description"`
+	PromptCmd                string `json:"promptCmd"`
+	PromptCmdEnabled         bool   `json:"promptCmdEnabled"`
+	ChatTemplateCmd          string `json:"chatTemplateCmd"`
+	ChatTemplateVal          string `json:"chatTemplateVal"`
+	MultilineInputCmd        string `json:"multilineInputCmd"`
+	MultilineInputCmdEnabled bool   `json:"multilineInputCmdEnabled"`
+	CtxSizeCmd               string `json:"ctxSizeCmd"`
+	CtxSizeVal               string `json:"ctxSizeVal"`
+	RopeScaleVal             string `json:"ropeScaleVal"`
+	RopeScaleCmd             string `json:"ropeScaleCmd"`
+	PromptCacheAllCmd        string `json:"promptCacheAllCmd"`
+	PromptCacheAllEnabled    bool   `json:"promptCacheAllEnabled"`
+	PromptCacheCmd           string `json:"promptCacheCmd"`
+	PromptCacheVal           string `json:"promptCacheVal"`
+	PromptFileCmd            string `json:"promptFileCmd"`
+	PromptFileVal            string `json:"promptFileVal"`
+	ReversePromptCmd         string `json:"reversePromptCmd"`
+	ReversePromptVal         string `json:"reversePromptVal"`
+	InPrefixCmd              string `json:"inPrefixCmd"`
+	InPrefixVal              string `json:"inPrefixVal"`
+	InSuffixCmd              string `json:"inSuffixCmd"`
+	InSuffixVal              string `json:"inSuffixVal"`
+	GPULayersCmd             string `json:"gPULayersCmd"`
+	GPULayersVal             string `json:"gPULayersVal"`
+	ThreadsBatchCmd          string `json:"threadsBatchCmd"`
+	ThreadsBatchVal          string `json:"threadsBatchVal"`
+	ThreadsCmd               string `json:"threadsCmd"`
+	ThreadsVal               string `json:"threadsVal"`
+	KeepCmd                  string `json:"keepCmd"`
+	KeepVal                  string `json:"keepVal"`
+	TopKCmd                  string `json:"topKCmd"`
+	TopKVal                  string `json:"topKVal"`
+	MainGPUCmd               string `json:"mainGPUCmd"`
+	MainGPUVal               string `json:"mainGPUVal"`
+	RepeatPenaltyCmd         string `json:"repeatPenaltyCmd"`
+	RepeatPenaltyVal         string `json:"repeatPenaltyVal"`
+	RepeatLastPenaltyCmd     string `json:"repeatLastPenaltyCmd"`
+	RepeatLastPenaltyVal     string `json:"repeatLastPenaltyVal"`
+	MemLockCmd               string `json:"memLockCmd"`
+	MemLockCmdEnabled        bool   `json:"memLockCmdEnabled"`
+	NoMMApCmd                string `json:"noMMApCmd"`
+	NoMMApCmdEnabled         bool   `json:"noMMApCmdEnabled"`
+	EscapeNewLinesCmd        string `json:"escapeNewLinesCmd"`
+	EscapeNewLinesCmdEnabled bool   `json:"escapeNewLinesCmdEnabled"`
+	LogVerboseCmd            string `json:"logVerboseCmd"`
+	LogVerboseEnabled        bool   `json:"logVerboseEnabled"`
+	TemperatureVal           string `json:"temperatureVal"`
+	TemperatureCmd           string `json:"temperatureCmd"`
+	PredictCmd               string `json:"predictCmd"`
+	PredictVal               string `json:"predictVal"`
+	ModelFullPath            string `json:"modelFullPath"`
+	ModelCmd                 string `json:"modelCmd"`
+	PromptText               string `json:"promptText"`
+	NoDisplayPromptCmd       string `json:"noDisplayPromptCmd"`
+	NoDisplayPromptEnabled   bool   `json:"noDisplayPromptEnabled"`
+	TopPCmd                  string `json:"topPCmd"`
+	TopPVal                  string `json:"topPVal"`
+	MinPCmd                  string `json:"MinPCmd"`
+	MinPVal                  string `json:"MinPVal"`
+	ModelLogFileCmd          string `json:"modelLogFileCmd"`
+	ModelLogFileNameVal      string `json:"modelLogFileNameVal"`
+	FlashAttentionCmd        string `json:"flashAttentionCmd"`
+	FlashAttentionCmdEnabled bool   `json:"flashAttentionCmdEnabled"`
 }
 
 type LlamaEmbedArgs struct {
@@ -394,6 +380,7 @@ type DefaultAppArgs struct {
 	EmbedModelFileName       string `json:"embedModelFileName"`
 	ModelLogFolderNamePath   string `json:"modelLogFolderNamePath"`
 	ReportDataPath           string `json:"reportDataPath"`
+	AppDBFullPath            string `json:"appDBFullPath"`
 }
 
 type ModelNameFullPath struct {
@@ -440,12 +427,21 @@ type ReportPromptTemplate struct {
 	ReportDate      string
 	AssistantPrompt string
 }
-type PromptTemplate struct {
+type SystemPrompt struct {
 	SystemPrompt    string
 	UserPrompt      string
-	Question        string
+	Input           string
 	AssistantPrompt string
 }
+type Template struct {
+	Text string
+}
+type InstPrompt struct {
+	InstStart string
+	Input     string
+	InstEnd   string
+}
+
 type PDFLoader struct {
 	loader Loader
 

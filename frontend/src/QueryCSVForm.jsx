@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Card, Button } from 'react-bootstrap';
+import {useState, useEffect} from 'react';
+import {Card, Button} from 'react-bootstrap';
 
 import {QueryCSVEmbeddingWithCancel} from "../wailsjs/go/main/App.js";
+import {LogError} from "../wailsjs/runtime/runtime.js";
 
 import {useLlamaEmbedSettings} from "./LlamaEmbedSettingsContextHooks.jsx";
 import {useLlamaCliSettings} from "./LlamaCliSettingsContextHooks.jsx";
@@ -17,8 +18,30 @@ const INITIAL_FORM_STATE = {
     whereKey: ''
 };
 
-const FormInput = ({ label, name, value, onChange, className = "w-100" }) => (
-    <div className="col">
+const OUTPUT_STYLES = {
+    preWrap: {whiteSpace: "pre-wrap", height: "50vh"}
+};
+
+const useLocalStorage = (key, initialValue) => {
+    const loadFromStorage = () => {
+        const saved = window.localStorage.getItem(key);
+        return saved ? JSON.parse(saved) : initialValue;
+    };
+
+    const saveToStorage = (data) => {
+        window.localStorage.setItem(key, JSON.stringify(data));
+    };
+
+    return [loadFromStorage, saveToStorage];
+};
+
+const QueryOutput = ({content}) => (<div className="overflow-y-scroll">
+        <p style={OUTPUT_STYLES.preWrap} className="font-monospace fw-medium lh-small">
+            {content}
+        </p>
+    </div>);
+
+const FormInput = ({label, name, value, onChange, className = "w-100"}) => (<div className="col">
         <label className="w-auto form-label">{label}</label>
         <input
             className={`${className} form-control form-control-sm`}
@@ -26,74 +49,64 @@ const FormInput = ({ label, name, value, onChange, className = "w-100" }) => (
             name={name}
             value={value}
             onChange={onChange}
+            minLength={1}
         />
-    </div>
-);
+    </div>);
+
+const useFormHandlers = (initialState, onSave) => {
+    const [formData, setFormData] = useState(initialState);
+
+    const handleChange = (e) => {
+        const {name, value} = e.target;
+        const newData = {...formData, [name]: value};
+        setFormData(newData);
+        onSave(newData);
+    };
+
+    const handleTableListChange = (e) => {
+        const tables = e.target.value.split(',').map(table => table.trim());
+        const newData = {...formData, tableList: tables};
+        setFormData(newData);
+        onSave(newData);
+    };
+
+    return {formData, setFormData, handleChange, handleTableListChange};
+};
 
 export const QueryCSVForm = () => {
-    const [out, setOut] = useState("");
-    const embedState = useLlamaEmbedSettings();
-    const cliState = useLlamaCliSettings();
-    const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+    const [queryOutput, setQueryOutput] = useState("");
+    const embedSettings = useLlamaEmbedSettings();
+    const cliSettings = useLlamaCliSettings();
+    const [loadStorage, saveStorage] = useLocalStorage('state', INITIAL_FORM_STATE);
+
+    const {
+        formData,
+        setFormData,
+        handleChange,
+        handleTableListChange
+    } = useFormHandlers(INITIAL_FORM_STATE, saveStorage);
 
     useEffect(() => {
-        const savedState = JSON.parse(window.localStorage.getItem('state'));
+        const savedState = loadStorage();
         if (savedState) {
             setFormData(savedState);
         }
     }, []);
 
-    const saveToLocalStorage = (data) => {
-        window.localStorage.setItem('state', JSON.stringify(data));
-    };
-
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        const newFormData = {
-            ...formData,
-            [name]: value
-        };
-        setFormData(newFormData);
-        saveToLocalStorage(newFormData);
-    };
-
-    const handleTableListChange = (e) => {
-        const tables = e.target.value.split(',').map(table => table.trim());
-        const newFormData = {
-            ...formData,
-            tableList: tables
-        };
-        setFormData(newFormData);
-        saveToLocalStorage(newFormData);
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const result = await QueryCSVEmbeddingWithCancel(
-            cliState,
-            embedState,
-            formData.dbPath,
-            formData.reportTemplatePath,
-            formData.reportDataPath,
-            formData.whereKey,
-            formData.queryField,
-            formData.queryValue,
-            formData.tableList
-        );
-        setOut(result);
-        console.log(result);
+        try {
+            const result = await QueryCSVEmbeddingWithCancel(cliSettings, embedSettings, formData.dbPath, formData.reportTemplatePath, formData.reportDataPath, formData.whereKey, formData.queryField, formData.queryValue, formData.tableList);
+            setQueryOutput(result);
+        }catch (error){
+            LogError(error)
+        }
     };
 
-    return (
-        <div className="d-flex flex-column flex-fill">
-            <div className="overflow-y-scroll">
-                <p style={{ whiteSpace: "pre-wrap", height: "50vh" }}
-                   className="font-monospace fw-medium lh-small">
-                    {out}
-                </p>
-            </div>
+    return (<div className="d-flex flex-column flex-fill w-100">
+            <QueryOutput content={queryOutput}/>
             <div className="d-flex flex-column w-100">
-                <Card>
+                <Card className="shadow rounded">
                     <Card.Body>
                         <Card.Title>CSV Query configuration</Card.Title>
                         <form onSubmit={handleSubmit}>
@@ -150,7 +163,7 @@ export const QueryCSVForm = () => {
                                     className="w-50"
                                 />
                             </div>
-                            <div className="w-100">
+                            <div className="w-100 p-2">
                                 <Button variant="primary" type="submit" className="float-end">
                                     Submit Query
                                 </Button>
@@ -159,7 +172,5 @@ export const QueryCSVForm = () => {
                     </Card.Body>
                 </Card>
             </div>
-        </div>
-    );
+        </div>);
 };
-

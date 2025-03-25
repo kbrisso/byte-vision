@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Button, Card } from 'react-bootstrap';
+
 import { QueryTextEmbeddingWithCancel } from "../wailsjs/go/main/App.js";
+
 import { useLlamaEmbedSettings } from "./LlamaEmbedSettingsContextHooks.jsx";
 import { useLlamaCliSettings } from "./LlamaCliSettingsContextHooks.jsx";
 
@@ -28,6 +30,7 @@ const FormInput = ({ name, label, value, onChange, colSpan }) => (
             className="w-100 form-control form-control-sm"
             type="text"
             name={name}
+            minLength={1}
             value={value}
             onChange={onChange}
         />
@@ -55,8 +58,6 @@ export const QueryTextForm = () => {
     };
 
     const handleQuerySubmit = async (e) => {
-        console.log(embedSettings);
-        console.log(cliSettings);
         e.preventDefault();
         const result = await QueryTextEmbeddingWithCancel(
             cliSettings,
@@ -68,11 +69,10 @@ export const QueryTextForm = () => {
             formData.queryValue
         );
         setQueryResult(result);
-        console.log(result);
     };
 
     return (
-        <div className="d-flex flex-column flex-fill">
+        <div className="d-flex flex-column flex-fill w-100">
             <div className="overflow-y-scroll">
                 <p style={{ whiteSpace: "pre-wrap", height: "50vh" }}
                    className="font-monospace fw-medium lh-small">
@@ -80,9 +80,9 @@ export const QueryTextForm = () => {
                 </p>
             </div>
             <div className="d-flex flex-column w-100">
-                <Card>
+                <Card className="shadow rounded">
                     <Card.Body>
-                        <Card.Title>CSV Query configuration</Card.Title>
+                        <Card.Title>Text Query configuration</Card.Title>
                         <form onSubmit={handleQuerySubmit}>
                             <div className="row">
                                 {FORM_FIELDS.map(field => (
@@ -94,7 +94,7 @@ export const QueryTextForm = () => {
                                     />
                                 ))}
                             </div>
-                            <div className="w-100">
+                            <div className="w-100 p-2">
                                 <Button variant="primary" className="float-end" type="submit">
                                     Submit Query
                                 </Button>

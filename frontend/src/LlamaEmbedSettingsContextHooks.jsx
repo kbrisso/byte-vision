@@ -1,5 +1,5 @@
-
 import {createContext, useReducer, useContext} from 'react';
+
 export const LlamaEmbedArgs = {
 
     EmbedMainGPUCmd: "",
@@ -51,15 +51,13 @@ function settingsReducer(state, action) {
     switch (action.type) {
         case 'SET_FIELD':
             return {
-                ...state,
-                [action.field]: action.value,
+                ...state, [action.field]: action.value,
             };
         case 'RESET_STATE':
             return state;
         case 'SET_MULTIPLE_FIELDS':
             return {
-                ...state,
-                ...action.payload, // Merge new fields into state
+                ...state, ...action.payload, // Merge new fields into state
             };
         default:
             throw new Error(`Unhandled action type: ${action.type}`);
@@ -70,13 +68,11 @@ function settingsReducer(state, action) {
 export const LlamaEmbedSettingsProvider = ({children}) => {
     const [state, dispatch] = useReducer(settingsReducer, LlamaEmbedArgs);
 
-    return (
-        <LlamaEmbedSettingsContext.Provider value={state}>
+    return (<LlamaEmbedSettingsContext.Provider value={state}>
             <LlamaEmbedSettingsDispatchContext.Provider value={dispatch}>
                 {children}
             </LlamaEmbedSettingsDispatchContext.Provider>
-        </LlamaEmbedSettingsContext.Provider>
-    );
+        </LlamaEmbedSettingsContext.Provider>);
 };
 
 // Custom hooks for consuming state and dispatch

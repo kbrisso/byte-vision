@@ -1,9 +1,10 @@
 import {createContext, useReducer, useContext} from 'react';
+
 export const DefaultAppArgs = {
 
     ModelPath: "",
     AppLogPath: "",
-    AppLogFileName:"",
+    AppLogFileName: "",
     PromptTemplateFolderName: "",
     PromptCacheFolderName: "",
     ModelFolderName: "",
@@ -14,7 +15,7 @@ export const DefaultAppArgs = {
     ModelFileName: "",
     EmbedModelFileName: "",
     ModelLogFolderNamePath: "",
-    ReportDataPath:"",
+    ReportDataPath: "",
 };
 
 // Context creation
@@ -26,15 +27,13 @@ function settingsReducer(state, action) {
     switch (action.type) {
         case 'SET_FIELD':
             return {
-                ...state,
-                [action.field]: action.value,
+                ...state, [action.field]: action.value,
             };
         case 'RESET_STATE':
             return state;
         case 'SET_MULTIPLE_FIELDS':
             return {
-                ...state,
-                ...action.payload, // Merge new fields into state
+                ...state, ...action.payload, // Merge new fields into state
             };
         default:
             throw new Error(`Unhandled action type: ${action.type}`);
@@ -45,13 +44,11 @@ function settingsReducer(state, action) {
 export const AppSettingsProvider = ({children}) => {
     const [state, dispatch] = useReducer(settingsReducer, DefaultAppArgs);
 
-    return (
-        <AppSettingsContext.Provider value={state}>
+    return (<AppSettingsContext.Provider value={state}>
             <AppSettingsDispatchContext.Provider value={dispatch}>
                 {children}
             </AppSettingsDispatchContext.Provider>
-        </AppSettingsContext.Provider>
-    );
+        </AppSettingsContext.Provider>);
 };
 
 // Custom hooks for consuming state and dispatch

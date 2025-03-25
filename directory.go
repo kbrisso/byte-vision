@@ -83,6 +83,14 @@ func GetAppLogFile(appLogPath string) string {
 	return string(data)
 }
 func GetCurrentModelLogFile(modelLogPath string) string {
+
+	if _, err := os.Stat(modelLogPath); os.IsNotExist(err) {
+		err := os.MkdirAll(filepath.Dir(modelLogPath), os.ModePerm)
+		if err != nil {
+			Log.Error(err.Error())
+			return ""
+		}
+	}
 	data, err := os.ReadFile(filepath.Clean(modelLogPath))
 	if err != nil {
 		Log.Error(err.Error())
@@ -91,6 +99,13 @@ func GetCurrentModelLogFile(modelLogPath string) string {
 	return string(data)
 }
 func GetCurrentEmbedModelLogFile(embedModelLogPath string) string {
+	if _, err := os.Stat(embedModelLogPath); os.IsNotExist(err) {
+		err := os.MkdirAll(filepath.Dir(embedModelLogPath), os.ModePerm)
+		if err != nil {
+			Log.Error(err.Error())
+			return ""
+		}
+	}
 	data, err := os.ReadFile(filepath.Clean(embedModelLogPath))
 	if err != nil {
 		Log.Error(err.Error())

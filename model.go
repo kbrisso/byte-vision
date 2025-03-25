@@ -8,7 +8,7 @@ import (
 
 var llamaCppSanitizeRegexp = regexp.MustCompile(`\[.*?\]`)
 
-func GenerateCompletionWithCancel(ctx context.Context, args []string) ([]byte, error) {
+func GenerateSingleCompletionWithCancel(ctx context.Context, args []string) ([]byte, error) {
 	// Create a child context with cancel
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

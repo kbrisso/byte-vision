@@ -1,75 +1,72 @@
 import {createContext, useReducer, useContext} from 'react';
+
 export const LlamaCppArgs = {
 
-        ID: "",
-        Description: "",
-        PromptCmd: "",
-        PromptCmdEnabled: "",
-        ConversationCmd: "",
-        ConversationCmdEnabled: false,
-        ChatTemplateCmd: "",
-        ChatTemplateVal: "",
-        MultilineInputCmd: "",
-        MultilineInputCmdEnabled: false,
-        CtxSizeCmd: "",
-        CtxSizeVal: "",
-        RopeScaleVal: "",
-        RopeScaleCmd: "",
-        PromptCacheAllCmd: "",
-        PromptCacheAllEnabled: false,
-        PromptCacheCmd: "",
-        PromptCacheVal: "",
-        PromptFileCmd: "",
-        PromptFileVal: "",
-        InteractiveFirstCmd: "",
-        InteractiveFirstCmdEnabled: false,
-        InteractiveModeCmdEnabled: false,
-        InteractiveModeCmd: "",
-        ReversePromptCmd: "",
-        ReversePromptVal: "",
-        InPrefixCmd: "",
-        InPrefixVal: "",
-        InSuffixCmd: "",
-        InSuffixVal: "",
-        GPULayersCmd: "",
-        GPULayersVal: "",
-        ThreadsBatchCmd: "",
-        ThreadsBatchVal: "",
-        ThreadsCmd: "",
-        ThreadsVal: "",
-        KeepCmd: "",
-        KeepVal: "",
-        TopKCmd: "",
-        TopKVal: "",
-        MainGPUCmd: "",
-        MainGPUVal: "",
-        RepeatPenaltyCmd: "",
-        RepeatPenaltyVal: "",
-        RepeatLastPenaltyCmd: "",
-        RepeatLastPenaltyVal: "",
-        MemLockCmd: "",
-        MemLockCmdEnabled: false,
-        NoMMApCmd: "",
-        NoMMApCmdEnabled: false,
-        EscapeNewLinesCmd: "",
-        EscapeNewLinesCmdEnabled: false,
-        LogVerboseCmd: "",
-        LogVerboseEnabled: false,
-        TemperatureVal: "",
-        TemperatureCmd: "",
-        PredictCmd: "",
-        PredictVal: "",
-        ModelFullPath: "",
-        ModelCmd: "",
-        PromptText: "",
-        NoDisplayPromptCmd: "",
-        NoDisplayPromptEnabled: false,
-        TopPCmd: "",
-        TopPVal: "",
-        ModelLogFileCmd: "",
-        ModelLogFileNameVal: "",
-        FlashAttentionCmd: "",
-        FlashAttentionCmdEnabled: false,
+    ID: "",
+    Description: "",
+    PromptCmd: "",
+    PromptCmdEnabled: "",
+    ChatTemplateCmd: "",
+    ChatTemplateVal: "",
+    MultilineInputCmd: "",
+    MultilineInputCmdEnabled: false,
+    CtxSizeCmd: "",
+    CtxSizeVal: "",
+    RopeScaleVal: "",
+    RopeScaleCmd: "",
+    PromptCacheAllCmd: "",
+    PromptCacheAllEnabled: false,
+    PromptCacheCmd: "",
+    PromptCacheVal: "",
+    PromptFileCmd: "",
+    PromptFileVal: "",
+    ReversePromptCmd: "",
+    ReversePromptVal: "",
+    InPrefixCmd: "",
+    InPrefixVal: "",
+    InSuffixCmd: "",
+    InSuffixVal: "",
+    GPULayersCmd: "",
+    GPULayersVal: "",
+    ThreadsBatchCmd: "",
+    ThreadsBatchVal: "",
+    ThreadsCmd: "",
+    ThreadsVal: "",
+    KeepCmd: "",
+    KeepVal: "",
+    TopKCmd: "",
+    TopKVal: "",
+    MainGPUCmd: "",
+    MainGPUVal: "",
+    RepeatPenaltyCmd: "",
+    RepeatPenaltyVal: "",
+    RepeatLastPenaltyCmd: "",
+    RepeatLastPenaltyVal: "",
+    MemLockCmd: "",
+    MemLockCmdEnabled: false,
+    NoMMApCmd: "",
+    NoMMApCmdEnabled: false,
+    EscapeNewLinesCmd: "",
+    EscapeNewLinesCmdEnabled: false,
+    LogVerboseCmd: "",
+    LogVerboseEnabled: false,
+    TemperatureVal: "",
+    TemperatureCmd: "",
+    PredictCmd: "",
+    PredictVal: "",
+    ModelFullPath: "",
+    ModelCmd: "",
+    PromptText: "",
+    NoDisplayPromptCmd: "",
+    NoDisplayPromptEnabled: false,
+    TopPCmd: "",
+    TopPVal: "",
+    MinPCmd: "",
+    MinPVal: "",
+    ModelLogFileCmd: "",
+    ModelLogFileNameVal: "",
+    FlashAttentionCmd: "",
+    FlashAttentionCmdEnabled: false,
 };
 
 // Context creation
@@ -81,15 +78,13 @@ function settingsReducer(state, action) {
     switch (action.type) {
         case 'SET_FIELD':
             return {
-                ...state,
-                [action.field]: action.value,
+                ...state, [action.field]: action.value,
             };
         case 'RESET_STATE':
             return state;
         case 'SET_MULTIPLE_FIELDS':
             return {
-                ...state,
-                ...action.payload, // Merge new fields into state
+                ...state, ...action.payload, // Merge new fields into state
             };
         default:
             throw new Error(`Unhandled action type: ${action.type}`);
@@ -100,13 +95,11 @@ function settingsReducer(state, action) {
 export const LlamaCliSettingsProvider = ({children}) => {
     const [state, dispatch] = useReducer(settingsReducer, LlamaCppArgs);
 
-    return (
-        <LlamaCliSettingsContext.Provider value={state}>
+    return (<LlamaCliSettingsContext.Provider value={state}>
             <LlamaCliSettingsDispatchContext.Provider value={dispatch}>
                 {children}
             </LlamaCliSettingsDispatchContext.Provider>
-        </LlamaCliSettingsContext.Provider>
-    );
+        </LlamaCliSettingsContext.Provider>);
 };
 
 // Custom hooks for consuming state and dispatch

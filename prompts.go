@@ -7,136 +7,135 @@ import (
 	"text/template"
 )
 
-// Package chat provides a chat prompt template.
-// Sometimes you need to define a chat prompt, this package provides a way to do that.
-
-func CreateSystemUserTemplate(input string) string {
-
-	templateStr := "{{.SystemPrompt }}{{.UserPrompt }}{{.Question }}{{.AssistantPrompt }}"
-
-	tmpl, err := template.New("templateStr").Parse(templateStr)
-	if err != nil {
-		fmt.Printf("Error parsing template: %v\n", err)
-		return ""
-	}
-	out := PromptTemplate{
-		SystemPrompt:    "system You are a smart AI assistant. You will give factual answers. \r\n",
-		UserPrompt:      " user ",
-		Question:        input + "\r\n",
-		AssistantPrompt: "assistant \r\n",
-	}
-
-	// Step 5: Execute the template against the data
-	var doc bytes.Buffer
-	err = tmpl.Execute(&doc, out) // Write the rendered template to stdout
-	if err != nil {
-		fmt.Printf("Error executing template: %v\n", err)
-		return ""
-	}
-	bytes1 := []byte(doc.String())
-	fmt.Printf("Bytes (Method 1): %v\n", len(bytes1))
-	return doc.String()
+/*
+<｜begin▁of▁sentence｜>{system_prompt}<｜User｜>{prompt}<｜Assistant｜>
+/*DeepSeek prompt
+<｜User｜>What is 1+1?<｜Assistant｜>
+*/
+var instDeepSeekTemplate = Template{"{{.InstStart }}{{.Input }}{{.InstEnd }}"}
+var instDeepSeekPrompt = InstPrompt{
+	InstStart: "<｜begin_of_sentence｜>\r\n User: ",
+	Input:     "",
+	InstEnd:   "Assistant: \r\n<｜end_of_sentence｜>",
 }
-func CreateMathTemplate(input string) string {
 
-	templateStr := "{{.SystemPrompt }}{{.Question }}{{.AssistantPrompt }}"
-
-	tmpl, err := template.New("templateStr").Parse(templateStr)
-	if err != nil {
-		fmt.Printf("Error parsing template: %v\n", err)
-		return ""
-	}
-	out := PromptTemplate{
-		SystemPrompt:    "Below is an instruction that describes a task. Write a response that appropriately completes the request.\r\n",
-		Question:        "### Instruction: \r\n" + input + "\r\n",
-		AssistantPrompt: "### Response:\r\n",
-	}
-
-	// Step 5: Execute the template against the data
-	var doc bytes.Buffer
-	err = tmpl.Execute(&doc, out) // Write the rendered template to stdout
-	if err != nil {
-		fmt.Printf("Error executing template: %v\n", err)
-		return ""
-	}
-	return doc.String()
+/*
+Llama 2
+<s>[INST] <<SYS>>
+{{ system_prompt }}
+<</SYS>>
+{{ user_message }} [/INST]
+*/
+var instTemplate = Template{"{{.InstStart }}{{.Input }}{{.InstEnd }}"}
+var instPrompt = InstPrompt{
+	InstStart: " [INST]\r\n",
+	Input:     "",
+	InstEnd:   "[/INST]\r\n",
 }
-func CreateLlamaTemplate(input string) string {
 
-	templateStr := "{{.SystemPrompt }}{{.UserPrompt }}{{.Question }}{{.AssistantPrompt }}"
+/*
+	System, User Assistant prompt
 
-	tmpl, err := template.New("templateStr").Parse(templateStr)
-	if err != nil {
-		fmt.Printf("Error parsing template: %v\n", err)
-		return ""
-	}
-	out := PromptTemplate{
-		SystemPrompt:    "<|begin_of_text|><|start_header_id|><|end_header_id|>You are a helpful assistant<|eot_id|>\r\n",
-		UserPrompt:      "<|start_header_id|>user<|end_header_id|>\r\n",
-		Question:        input + "\r\n",
-		AssistantPrompt: "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\r\n",
-	}
-
-	// Step 5: Execute the template against the data
-	var doc bytes.Buffer
-	err = tmpl.Execute(&doc, out) // Write the rendered template to stdout
-	if err != nil {
-		fmt.Printf("Error executing template: %v\n", err)
-		return ""
-	}
-	return doc.String()
+System You are a helpful AI assistant
+User
+Input
+Assistant
+*/
+var systemTemplate = Template{"{{.SystemPrompt }}{{.UserPrompt }}{{.Input }}{{.AssistantPrompt }}"}
+var systemPrompt = SystemPrompt{
+	SystemPrompt:    "System You are a helpful AI assistant.\r\n",
+	UserPrompt:      "User\r\n",
+	Input:           "",
+	AssistantPrompt: "Assistant\r\n",
 }
-func CreateInstTemplate(input string) string {
 
-	templateStr := "{{.UserPrompt }}{{.Question }}{{.AssistantPrompt }}"
-
-	tmpl, err := template.New("templateStr").Parse(templateStr)
-	if err != nil {
-		fmt.Printf("Error parsing template: %v\n", err)
-		return ""
-	}
-	out := PromptTemplate{
-		UserPrompt:      " [INST]",
-		Question:        input,
-		AssistantPrompt: "[/INST]\r\n",
-	}
-
-	// Step 5: Execute the template against the data
-	var doc bytes.Buffer
-	err = tmpl.Execute(&doc, out) // Write the rendered template to stdout
-	if err != nil {
-		fmt.Printf("Error executing template: %v\n", err)
-		return ""
-	}
-	return doc.String()
+/*
+LLama 3
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+{{ system_prompt }}<|eot_id|><|start_header_id|>user<|end_header_id|>
+{{ user_msg_1 }}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+{{ model_answer_1 }}<|eot_id|>
+*/
+var llamaTemplate = Template{"{{.SystemPrompt }}{{.UserPrompt }}{{.Input }}{{.AssistantPrompt }}"}
+var llamaPrompt = SystemPrompt{
+	SystemPrompt:    "<|begin_of_text|><|start_header_id|><|end_header_id|>You are a helpful AI assistant.<|eot_id|>\r\n",
+	UserPrompt:      "<|start_header_id|>User<|end_header_id|>\r\n",
+	Input:           "",
+	AssistantPrompt: "<|eot_id|><|start_header_id|>Assistant<|end_header_id|>\r\n",
 }
-func CreateReportTemplateWithMetadata(reportTemplatePath string, reportDataPath string) string {
-	// Step 1: Open the file
+
+// CreateSystemUserTemplate generates a formatted string by applying the input and SystemPrompt data to the provided template.
+// Returns the generated string or an error if template parsing or execution fails.
+func CreateSystemUserTemplate(systemPrompt SystemPrompt, systemTemplate Template, input string) (string, error) {
+	tmpl, err := template.New("systemTemplate").Parse(systemTemplate.Text)
+	if err != nil {
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateSystemUserTemplate: %w", err)
+	}
+	//Pass input string to prompt
+	systemPrompt.Input = input
+	var doc bytes.Buffer
+	err = tmpl.Execute(&doc, systemPrompt)
+	if err != nil {
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateSystemUserTemplate: %w", err)
+	}
+	return doc.String(), nil
+}
+
+// CreateInstTemplate constructs a string by applying input and prompts to a predefined template.
+// It returns the rendered template or an error on failure.
+// Parameters: instPrompt (InstPrompt), instTemplate (Template), input (string).
+// Errors: template parsing or execution errors.
+func CreateInstTemplate(instPrompt InstPrompt, instTemplate Template, input string) (string, error) {
+	tmpl, err := template.New("systemTemplate").Parse(instTemplate.Text)
+	if err != nil {
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateInstTemplate: %w", err)
+	}
+	//Pas input string to prompt
+	instPrompt.Input = input
+	var doc bytes.Buffer
+	err = tmpl.Execute(&doc, instPrompt)
+	if err != nil {
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateInstTemplate: %w", err)
+	}
+	return doc.String(), nil
+}
+
+// CreateReportTemplateWithMetadata generates a formatted report template string using template and report data files.
+// It reads the specified template and report data files, processes their contents, and combines them into a structure.
+// The function returns the rendered template string, or an error if an issue occurs during file operations or processing.
+func CreateReportTemplateWithMetadata(reportTemplatePath string, reportDataPath string) (string, error) {
+	//Open the template file
 	templateFile, err := os.Open(AppArgs.PromptTemplateFolderName + reportTemplatePath)
 	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
-		return ""
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateReportTemplateWithMetadata: %w", err)
 	}
 	tempStat, _ := os.Stat(AppArgs.PromptTemplateFolderName + reportTemplatePath)
 	tempSize := tempStat.Size()
-
+	//Open the data file
 	dataFile, err := os.Open(AppArgs.ReportDataPath + reportDataPath)
 	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
-		return ""
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateReportTemplateWithMetadata: %w", err)
 	}
 	tempStat, _ = os.Stat(AppArgs.ReportDataPath + reportDataPath)
 	dataSize := tempStat.Size()
 	defer func(templateFile *os.File) {
 		err := templateFile.Close()
 		if err != nil {
-
+			Log.Error(err.Error())
+			return
 		}
 	}(templateFile)
 	defer func(dataFile *os.File) {
 		err := dataFile.Close()
 		if err != nil {
-
+			Log.Error(err.Error())
+			return
 		}
 	}(dataFile)
 
@@ -144,39 +143,29 @@ func CreateReportTemplateWithMetadata(reportTemplatePath string, reportDataPath 
 	templateContent := make([]byte, tempSize)    // Example buffer size
 	n, err := templateFile.Read(templateContent) // Read the file into the buffer
 	if err != nil && err.Error() != "EOF" {
-		fmt.Printf("Error reading file: %v\n", err)
-		return ""
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateReportTemplateWithMetadata: %w", err)
 	}
 	dataContent := make([]byte, dataSize) // Example buffer size
 	d, err := dataFile.Read(dataContent)  // Read the file into the buffer
 	if err != nil && err.Error() != "EOF" {
-		fmt.Printf("Error reading file: %v\n", err)
-		return ""
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateReportTemplateWithMetadata: %w", err)
 	}
 
 	content := string(templateContent[:n]) // Convert the content into a string
-
-	// Optional: Trim the file content (if needed)
 	data := string(dataContent[:d])
 
-	// Step 3: Define a string template (or use from file)
+	//Build  a string template
 	reportTemplateStr := "{{.SystemPrompt }}{{.UserPrompt }}{{.ReportDate }}{{.ReportTemplate }}{{.AssistantPrompt }}"
 
-	// Step 4: Parse and execute the template
+	//Parse and execute the new template
 	tmpl, err := template.New("reportTemplateStr").Parse(reportTemplateStr)
 	if err != nil {
-		fmt.Printf("Error parsing template: %v\n", err)
-		return ""
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateReportTemplateWithMetadata: %w", err)
 	}
-
-	/*// Create data for the template
-	out := ReportPromptTemplate{
-		SystemPrompt:    "<s>[INST] \r\n",
-		UserPrompt:      "Please use the report template provided with #### to build a report. Please use the data provided between context start and end. List out the data in a table format with the appropriate headers. \r\n",
-		ReportTemplate:  content,
-		ReportDate:      data,
-		AssistantPrompt: "[/INST] \r\n",
-	}*/
+	//Create final template string
 	out := ReportPromptTemplate{
 		SystemPrompt:    "",
 		UserPrompt:      "user Step 1. With the report data provided create a report sorted by field lastName alphabetically. Step 2 Format the report using the template instructions as a guide.\r\n",
@@ -185,12 +174,12 @@ func CreateReportTemplateWithMetadata(reportTemplatePath string, reportDataPath 
 		AssistantPrompt: "assistant\r\n",
 	}
 
-	// Step 5: Execute the template against the data
+	//Execute the template against the data
 	var doc bytes.Buffer
-	err = tmpl.Execute(&doc, out) // Write the rendered template to stdout
+	err = tmpl.Execute(&doc, out) // Write the rendered template out to stdout
 	if err != nil {
-		fmt.Printf("Error executing template: %v\n", err)
-		return ""
+		Log.Error(err.Error())
+		return "", fmt.Errorf("error in CreateReportTemplateWithMetadata: %w", err)
 	}
-	return doc.String()
+	return doc.String(), nil
 }
