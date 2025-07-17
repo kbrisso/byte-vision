@@ -1,0 +1,1 @@
+wails dev -clean

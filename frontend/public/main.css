@@ -1,0 +1,215 @@
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import './theme.css';
+
+/* Override Bootstrap defaults with theme variables */
+body {
+    background-color: #1e293b;
+    color: #f8fafc;
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+}
+.card {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.card-header {
+    background-color: var(--bg-header) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.card-body {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-control {
+    background-color: var(--bg-input) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.form-control:focus {
+    background-color: var(--bg-input) !important;
+    border-color: var(--border-focus) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+}
+
+.form-control::placeholder {
+    color: var(--text-muted) !important;
+}
+
+.form-label {
+    color: var(--text-label) !important;
+}
+
+.btn-primary {
+    background-color: var(--btn-primary-bg) !important;
+    border-color: var(--btn-primary-border) !important;
+    color: var(--btn-primary-text) !important;
+}
+
+.btn-secondary {
+    background-color: var(--btn-secondary-bg) !important;
+    border-color: var(--btn-secondary-border) !important;
+    color: var(--btn-secondary-text) !important;
+}
+
+.btn-outline-secondary {
+    background-color: transparent !important;
+    border-color: var(--btn-secondary-border) !important;
+    color: var(--btn-secondary-text) !important;
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--btn-secondary-border) !important;
+    border-color: var(--btn-secondary-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.alert-info {
+    background-color: var(--alert-info-bg) !important;
+    border-color: var(--alert-info-border) !important;
+    color: var(--alert-info-text) !important;
+}
+
+.alert-danger {
+    background-color: var(--alert-danger-bg) !important;
+    border-color: var(--alert-danger-border) !important;
+    color: var(--alert-danger-text) !important;
+}
+
+.nav-tabs .nav-link {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-tertiary) !important;
+}
+
+.nav-tabs .nav-link:hover {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.table {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.table th {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border-secondary) !important;
+}
+
+.table td {
+    border-color: var(--border-tertiary) !important;
+}
+
+.table tbody tr:hover {
+    background-color: var(--bg-secondary) !important;
+}
+
+.modal-content {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-header {
+    background-color: var(--bg-header) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-body {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-footer {
+    background-color: var(--bg-secondary) !important;
+    border-color: var(--border-secondary) !important;
+}
+
+/* Global body styles */
+body {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+}
+
+/* List group styles */
+.list-group-item {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-secondary) !important;
+    color: var(--text-primary) !important;
+}
+
+.list-group-item:hover {
+    background-color: var(--bg-secondary) !important;
+}
+
+/* Spinner styles */
+.spinner-border {
+    color: var(--border-secondary) !important;
+}
+
+/* Text utilities */
+.text-muted {
+    color: var(--text-muted) !important;
+}
+
+.text-secondary {
+    color: var(--text-secondary) !important;
+}
+/* Document Question Modal Custom Sizing */
+.document-question-modal .modal-dialog {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    margin: 2.5vh auto !important;
+}
+
+.document-question-modal .modal-content {
+    height: 90vh !important;
+    max-height: 90vh !important;
+}
+
+.document-question-modal .modal-body {
+    overflow: hidden !important;
+    padding: 0 !important;
+}
+.history-hover-div:hover {
+    background-color: var(--bs-primary) !important; /* Change to desired hover color */
+    color: var(--bs-white) !important; /* Adjust text color for contrast if needed */
+}
+
+/* Ensure the modal takes up most of the screen */
+@media (min-width: 1400px) {
+    .document-question-modal .modal-dialog {
+        max-width: 90vw !important;
+        width: 90vw !important;
+    }
+}
+
+/* For smaller screens, maintain responsive behavior */
+@media (max-width: 768px) {
+    .document-question-modal .modal-dialog {
+        max-width: 98vw !important;
+        width: 98vw !important;
+        margin: 1vh auto !important;
+    }
+
+    .document-question-modal .modal-content {
+        height: 95vh !important;
+        max-height: 95vh !important;
+    }
+}
