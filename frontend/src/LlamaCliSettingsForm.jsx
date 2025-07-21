@@ -1,904 +1,1042 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Card, Col, Form, Row, Spinner } from "react-bootstrap";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 
 import { LogError } from "../wailsjs/runtime/runtime.js";
 import "../public/main.css";
 
-import { useLlamaCliSettings } from "./LlamaCliSettingsHooks.jsx";
 import { useSettingsState } from "./StoreConfig.jsx";
 
 export const LlamaCliSettingsForm = () => {
-  const {
-    llamaCliSettings,
-    settingsLoading,
-    settingsError,
-    isLoading,
-    loadModels,
-    loadSavedSettings,
-    saveCliSettings,
-    updateCliField,
-    updateCliFields,
-    loadSavedSetting,
-    validateSettings,
-  } = useLlamaCliSettings();
+    const {
+        settings,
+        settingsLoading,
+        settingsError,
+        models,
+        modelsLoading,
+        savedCliSettings,
+        savedSettingsLoading,
+        formState,
+        loadDefaultSettings,
+        loadModels,
+        loadSavedCliSettings,
+        saveCliSettings,
+        updateCliField,
+        updateCliFields,
+        loadSavedCliSetting,
+        validateCliSettings,
+        updateCliFormState,
+    } = useSettingsState();
 
-  const { settings } = useSettingsState();
+    // Local initialization state to avoid cross-component interference
+    const [localInitialized, setLocalInitialized] = useState(false);
+    const [errors, setErrors] = useState({});
+    const [saveState, setSaveState] = useState('idle'); // 'idle', 'saving', 'success', 'error'
+    const [saveMessage, setSaveMessage] = useState('');
+    const initializationRef = useRef(false);
+    const saveTimeoutRef = useRef(null);
 
-  const appSettings = useMemo(
-    () => settings?.appSettings || {},
-    [settings?.appSettings],
-  );
+    // Derived state - memoized to prevent unnecessary re-renders
+    const llamaCliSettings = useMemo(() => settings.llamaCli || {}, [settings.llamaCli]);
+    const appSettings = useMemo(() => settings?.app || {}, [settings?.app]);
+    const savedSettings = useMemo(() => savedCliSettings || [], [savedCliSettings]);
+    const selectedModel = useMemo(() => formState.cli?.selectedModel || "", [formState.cli?.selectedModel]);
+    const selectedSavedSetting = useMemo(() => formState.cli?.selectedSavedSetting || "", [formState.cli?.selectedSavedSetting]);
 
-  // Local component state
-  const [models, setModels] = useState([]);
-  const [selectedModel, setSelectedModel] = useState("");
-  const [errors, setErrors] = useState({});
-  const [savedSettings, setSavedSettings] = useState([]);
-  const [selectedSavedSetting, setSelectedSavedSetting] = useState("");
-  const [loadingSavedSettings, setLoadingSavedSettings] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+    // Combined loading state
+    const isLoading = useMemo(() =>
+            settingsLoading || modelsLoading || savedSettingsLoading || saveState === 'saving',
+        [settingsLoading, modelsLoading, savedSettingsLoading, saveState]
+    );
 
-  // Memoize stable values to prevent infinite re-renders
-  const stableAppSettings = useMemo(() => appSettings, [appSettings]);
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
 
-  const stableLlamaCliSettings = useMemo(
-    () => llamaCliSettings,
-    [llamaCliSettings],
-  );
+    // Single initialization effect
+    useEffect(() => {
+        if (initializationRef.current || localInitialized) return;
 
-  // Initialize models when the component mounts
-  useEffect(() => {
-    const initializeModels = async () => {
-      if (models.length > 0 || settingsLoading || initialized) return;
+        const initializeData = async () => {
+            initializationRef.current = true;
 
-      try {
-        setInitialized(true);
-        const formattedModels = await loadModels();
-        setModels(formattedModels);
-
-        // Set the initially selected model if available
-        let selectedId;
-        if (stableLlamaCliSettings.ModelFullPathVal?.length) {
-          selectedId = stableLlamaCliSettings.ModelFullPathVal;
-        } else if (stableAppSettings?.ModelFullPathVal?.length) {
-          selectedId = stableAppSettings?.ModelFullPathVal;
-          updateCliField("ModelFullPathVal", selectedId);
-        } else if (
-          stableAppSettings?.ModelPath &&
-          stableAppSettings?.ModelFileName
-        ) {
-          selectedId = `${stableAppSettings?.ModelPath}${stableAppSettings?.ModelFileName}`;
-        }
-
-        if (selectedId) {
-          const selectedModel = formattedModels.find(
-            (item) => item.id === selectedId,
-          );
-          if (selectedModel) {
-            const logFileName = `${stableAppSettings?.AppLogPath || ""}${selectedModel.ModelName}.log`;
-            updateCliFields({
-              ModelLogFileNameVal: logFileName,
-              ModelFullPathVal: selectedId,
-            });
-            setSelectedModel(selectedModel.FullPath);
-          }
-        }
-
-        // Handle prompt cache
-        if (
-          stableLlamaCliSettings.PromptFileVal?.length &&
-          stableAppSettings?.PromptCachePath
-        ) {
-          const promptCacheValue =
-            stableLlamaCliSettings.PromptFileVal.substring(
-              stableAppSettings?.PromptCachePath.length,
-            );
-          updateCliField("PromptCacheVal", promptCacheValue);
-        }
-      } catch (error) {
-        LogError(`Failed to initialize models: ${error}`);
-      }
-    };
-
-    initializeModels().catch();
-  }, [
-    models.length,
-    settingsLoading,
-    initialized,
-    stableAppSettings,
-    stableLlamaCliSettings,
-    loadModels,
-    updateCliField,
-    updateCliFields,
-  ]);
-
-  // Load saved settings when the component mounts
-  useEffect(() => {
-    const loadSaved = async () => {
-      try {
-        setLoadingSavedSettings(true);
-        const savedSettingsData = await loadSavedSettings();
-        setSavedSettings(savedSettingsData);
-      } catch (error) {
-        LogError("Failed to load saved settings: " + error);
-        setSavedSettings([]);
-      } finally {
-        setLoadingSavedSettings(false);
-      }
-    };
-
-    loadSaved().catch();
-  }, [loadSavedSettings]);
-
-  // Handle field changes
-  const handleChange = useCallback(
-    (field, value) => {
-      // Update the field in the store
-      updateCliField(field, value);
-
-      // Validate the field
-      const tempSettings = { ...llamaCliSettings, [field]: value };
-      const validation = validateSettings(tempSettings);
-
-      setErrors(validation.errors);
-    },
-    [updateCliField, llamaCliSettings, validateSettings],
-  );
-
-  // Handle path-based field changes
-  const handlePathChange = useCallback(
-    (basePath, field, value) => {
-      if (!value.length) {
-        updateCliField(field, value);
-        return;
-      }
-
-      const newValue =
-        value.length <= basePath.length
-          ? basePath + value
-          : basePath + value.substring(basePath.length);
-
-      updateCliField(field, newValue);
-    },
-    [updateCliField],
-  );
-
-  // Handle model log changes
-  const handleModelLogChange = useCallback(
-    (field, value) => {
-      handlePathChange(appSettings?.ModelLogPath || "", field, value);
-    },
-    [handlePathChange, appSettings?.ModelLogPath],
-  );
-
-  // Handle model selection
-  const handleModelChange = useCallback(
-    (event) => {
-      const selectedId = event.target.value;
-      const selectedModelData = models.find(
-        (model) => model.FullPath === selectedId,
-      );
-
-      if (selectedModelData) {
-        const logFileName = `${appSettings?.ModelLogPath || ""}${selectedModelData.ModelName}.log`;
-
-        updateCliFields({
-          ModelLogFileNameVal: logFileName,
-          ModelFullPathVal: selectedId,
-        });
-
-        setSelectedModel(selectedModelData.FullPath);
-      }
-    },
-    [models, appSettings?.ModelLogPath, updateCliFields],
-  );
-
-  // Handle loading saved settings
-  const handleLoadSavedSetting = useCallback(
-    async (event) => {
-      const selectedIndex = event.target.value;
-      setSelectedSavedSetting(selectedIndex);
-
-      if (!selectedIndex || selectedIndex === "") return;
-
-      try {
-        const loadedSettings = await loadSavedSetting(
-          savedSettings,
-          selectedIndex,
-        );
-
-        if (loadedSettings && loadedSettings.ModelFullPathVal) {
-          setSelectedModel(loadedSettings.ModelFullPathVal);
-        }
-      } catch (error) {
-        LogError("Failed to load saved setting: " + error);
-      }
-    },
-    [savedSettings, loadSavedSetting],
-  );
-
-  // Handle form submission
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const validation = validateSettings();
-    setErrors(validation.errors);
-
-    if (!validation.isValid) {
-      LogError("Please fix validation errors before saving.");
-      return;
-    }
-
-    try {
-      await saveCliSettings(llamaCliSettings.Description, llamaCliSettings);
-
-      // Refresh saved settings list
-      const updatedSavedSettings = await loadSavedSettings();
-      setSavedSettings(updatedSavedSettings);
-    } catch (error) {
-      LogError("Failed to save settings: " + error);
-    }
-  };
-
-  // Format date helper
-  const formatDate = useCallback((dateString) => {
-    if (!dateString) return "";
-
-    try {
-      const date = new Date(dateString);
-      return (
-        date.toLocaleDateString() +
-        " " +
-        date.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
-    } catch (error) {
-      LogError(`Error formatting date: ${error}`);
-      return dateString;
-    }
-  }, []);
-
-  // Render form field helper with theme styling
-  const renderFormField = (label, cmdValue, fieldId, inputProps = {}) => {
-    const { helperText, value, onChange, type, ...cleanInputProps } =
-      inputProps;
-
-    return (
-      <div className="theme-spacing-sm">
-        <Row className="g-2 align-items-center">
-          <Col md={3}>
-            <Form.Label className="theme-form-label mb-0" column={"lg"}>
-              {label}
-            </Form.Label>
-            <div
-              style={{
-                fontSize: "0.7rem",
-                color: "var(--text-quaternary)",
-                fontFamily: "monospace",
-              }}
-            >
-              {cmdValue || ""}
-            </div>
-          </Col>
-          <Col md={6}>
-            <Form.Control
-              id={fieldId}
-              type={type}
-              value={value ?? ""}
-              onChange={(e) => {
-                let processedValue = e.target.value;
-
-                if (type === "number") {
-                  if (processedValue === "") {
-                    processedValue = "";
-                  } else {
-                    const isFloatField = [
-                      "TemperatureVal",
-                      "TopPVal",
-                      "MinPVal",
-                      "RepeatPenaltyVal",
-                      "MirostatLrVal",
-                      "MirostatEntVal",
-                      "RopeScaleVal",
-                      "RopeFreqBaseVal",
-                      "RopeFreqScaleVal",
-                      "YarnExtFactorVal",
-                      "YarnAttnFactorVal",
-                      "YarnBetaSlowVal",
-                      "YarnBetaFastVal",
-                      "DefragTholdVal",
-                      "TopNSigmaVal",
-                      "XtcProbabilityVal",
-                      "XtcThresholdVal",
-                      "TypicalVal",
-                      "PresencePenaltyVal",
-                      "FrequencyPenaltyVal",
-                      "DryMultiplierVal",
-                      "DryBaseVal",
-                      "DynatempRangeVal",
-                      "DynatempExpVal",
-                    ].includes(fieldId);
-                    processedValue = isFloatField
-                      ? parseFloat(processedValue)
-                      : parseInt(processedValue, 10);
-
-                    if (isNaN(processedValue)) {
-                      processedValue = "";
-                    }
-                  }
+            try {
+                // Load saved settings first if needed
+                if (savedCliSettings.length === 0) {
+                    await loadSavedCliSettings();
                 }
 
-                onChange(processedValue);
-              }}
-              className="theme-form-control"
-              size="sm"
-              isInvalid={!!errors[fieldId]}
-              {...cleanInputProps}
-            />
-            {errors[fieldId] && (
-              <Form.Control.Feedback type="invalid">
-                {errors[fieldId]}
-              </Form.Control.Feedback>
-            )}
-          </Col>
-          {helperText && (
-            <Col md={3}>
-              <small
-                style={{
-                  color: "var(--text-quaternary)",
-                  fontSize: "0.75rem",
-                }}
-              >
-                {helperText}
-              </small>
-            </Col>
-          )}
-        </Row>
-      </div>
-    );
-  };
+                // Load default settings if no saved settings exist and no current settings
+                if (savedCliSettings.length === 0 && Object.keys(llamaCliSettings).length === 0) {
+                    await loadDefaultSettings();
+                }
 
-  // Render checkbox field helper with theme styling
-  const renderCheckboxField = (
-    label,
-    cmdValue,
-    fieldId,
-    isChecked,
-    helperText,
-  ) => (
-    <div className="theme-spacing-sm">
-      <Row className="g-2 align-items-center">
-        <Col md={3}>
-          <Form.Label className="theme-form-label mb-0" column={"lg"}>
-            {label}
-          </Form.Label>
-          <div
-            style={{
-              fontSize: "0.7rem",
-              color: "var(--text-quaternary)",
-              fontFamily: "monospace",
-            }}
-          >
-            {cmdValue || ""}
-          </div>
-        </Col>
-        <Col md={2}>
-          <div className="d-flex align-items-center gap-2">
-            <Form.Check
-              type="checkbox"
-              id={fieldId}
-              checked={!!isChecked}
-              onChange={(e) => handleChange(fieldId, e.target.checked)}
-              className="theme-form-check"
-            />
-            <Form.Label
-              htmlFor={fieldId}
-              className="theme-form-label mb-0"
-              style={{ fontSize: "0.75rem" }}
-            >
-              Enabled
-            </Form.Label>
-          </div>
-        </Col>
-        {helperText && (
-          <Col md={7}>
-            <small
-              style={{
-                color: "var(--text-quaternary)",
-                fontSize: "0.75rem",
-              }}
-            >
-              {helperText}
-            </small>
-          </Col>
-        )}
-      </Row>
-    </div>
-  );
+                // Load models if needed
+                if (models.length === 0) {
+                    await loadModels();
+                }
 
-  // Show loading state if settings haven't loaded yet
-  if (settingsLoading) {
-    return (
-      <div className="theme-container">
-        <div
-          className="d-flex justify-content-center align-items-center"
-          style={{ minHeight: "300px" }}
-        >
-          <div className="text-center">
-            <Spinner
-              animation="border"
-              className="theme-loading-spinner"
-              style={{ width: "2rem", height: "2rem" }}
-            />
-            <div className="theme-loading-text">Loading configuration...</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+                setLocalInitialized(true);
+            } catch (error) {
+                LogError(`Failed to initialize CLI data: ${error}`);
+                initializationRef.current = false;
+            }
+        };
 
-  return (
-    <div className="theme-container d-flex flex-column">
-      {/* Header */}
-      <Card
-        className="theme-header-card theme-spacing-sm"
-        style={{ flexShrink: 0 }}
-      >
-        <Card.Body className="py-2 px-3">
-          <div className="d-flex align-items-center justify-content-between">
-            <div className="d-flex align-items-center">
-              <i
-                className="bi bi-gear me-2 theme-icon"
-                style={{ fontSize: "1.1rem" }}
-              ></i>
-              <div>
-                <h5 className="mb-0" style={{ fontSize: "1rem" }}>
-                  Llama CLI Settings
-                </h5>
-                <small style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
-                  Configure LlamaCpp CLI parameters for AI inference and
-                  generation
-                </small>
-              </div>
-            </div>
-            <Button
-              type="submit"
-              form="cli-settings-form"
-              disabled={isLoading}
-              className="theme-btn-primary"
-              size="sm"
-            >
-              {isLoading ? (
-                <>
-                  <Spinner animation="border" size="sm" className="me-1" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <i className="bi bi-save me-1"></i>
-                  Save Settings
-                </>
-              )}
-            </Button>
-          </div>
-        </Card.Body>
-      </Card>
+        initializeData();
+    }, []); // Empty dependency array - run only once
 
-      {/* Error Display */}
-      {settingsError && (
-        <Alert
-          className="theme-alert-danger theme-spacing-sm"
-          style={{ flexShrink: 0 }}
-        >
-          <Alert.Heading className="h6">
-            <i className="bi bi-exclamation-triangle me-2"></i>
-            Configuration Error
-          </Alert.Heading>
-          <small>Error loading settings: {settingsError}</small>
-        </Alert>
-      )}
+    // Model initialization effect - separate from main initialization
+    useEffect(() => {
+        if (!localInitialized || models.length === 0 || Object.keys(llamaCliSettings).length === 0) return;
 
-      {/* Main Form - Scrollable */}
-      <Card className="theme-main-card flex-grow-1 d-flex flex-column">
-        <Card.Body className="p-3 d-flex flex-column">
-          <div className="flex-grow-1">
-            <Form id="cli-settings-form" onSubmit={handleSubmit}>
-              {/* Basic Configuration */}
-              <div className="theme-spacing-md">
-                <h6 className="theme-section-title">
-                  <i className="bi bi-info-circle me-1"></i>
-                  Basic Configuration
-                </h6>
+        const initializeModels = async () => {
+            try {
+                // Set the initially selected model if available
+                let selectedId;
+                if (llamaCliSettings.ModelFullPathVal?.length) {
+                    selectedId = llamaCliSettings.ModelFullPathVal;
+                } else if (appSettings?.ModelFullPathVal?.length) {
+                    selectedId = appSettings?.ModelFullPathVal;
+                    updateCliField("ModelFullPathVal", selectedId);
+                } else if (appSettings?.ModelPath && appSettings?.ModelFileName) {
+                    selectedId = `${appSettings.ModelPath}${appSettings.ModelFileName}`;
+                }
 
-                <Form.Group className="theme-spacing-sm">
-                  <Form.Label className="theme-form-label" column={"lg"}>
-                    Description *
-                  </Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={llamaCliSettings.Description ?? ""}
-                    onChange={(e) =>
-                      handleChange("Description", e.target.value)
+                if (selectedId) {
+                    const selectedModel = models.find((item) => item.id === selectedId);
+                    if (selectedModel) {
+                        const logFileName = `${appSettings?.AppLogPath || ""}${selectedModel.ModelName}.log`;
+                        updateCliFields({
+                            ModelLogFileNameVal: logFileName,
+                            ModelFullPathVal: selectedId,
+                        });
+                        updateCliFormState({ selectedModel: selectedModel.FullPath });
                     }
-                    placeholder="Enter a description for this CLI configuration"
-                    className="theme-form-control"
-                    size="sm"
-                    isInvalid={!!errors.Description}
-                  />
-                  {errors.Description && (
-                    <Form.Control.Feedback type="invalid">
-                      {errors.Description}
-                    </Form.Control.Feedback>
-                  )}
-                </Form.Group>
+                }
 
-                <Form.Group className="theme-spacing-sm">
-                  <Form.Label className="theme-form-label" column={"lg"}>
-                    Load Saved CLI Settings
-                  </Form.Label>
-                  <Form.Select
-                    value={selectedSavedSetting}
-                    onChange={handleLoadSavedSetting}
-                    disabled={loadingSavedSettings}
-                    className="theme-form-control"
-                    size="sm"
-                  >
-                    <option value="">Select saved settings to load...</option>
-                    {savedSettings.map((setting, index) => (
-                      <option key={index} value={index}>
-                        {setting.description ||
-                          setting.settings?.Description ||
-                          "Unnamed Setting"}
-                        {setting.createdAt &&
-                          ` - ${formatDate(setting.createdAt)}`}
-                      </option>
-                    ))}
-                  </Form.Select>
-                  {loadingSavedSettings && (
-                    <Form.Text
-                      style={{
-                        color: "var(--text-quaternary)",
-                        fontSize: "0.75rem",
-                      }}
-                    >
-                      <Spinner animation="border" size="sm" className="me-1" />
-                      Loading saved settings...
-                    </Form.Text>
-                  )}
-                </Form.Group>
+            } catch (error) {
+                LogError(`Failed to initialize CLI models: ${error}`);
+            }
+        };
 
-                <Form.Group className="theme-spacing-sm">
-                  <Form.Label className="theme-form-label" column={"lg"}>
-                    Model Selection
-                  </Form.Label>
-                  <Form.Select
-                    value={selectedModel}
-                    onChange={handleModelChange}
-                    disabled={models.length === 0}
-                    className="theme-form-control"
-                    size="sm"
-                  >
-                    <option value="">Select a model...</option>
-                    {models.map((model) => (
-                      <option key={model.id} value={model.FullPath}>
-                        {model.ModelName} - {model.FullPath}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </div>
+        initializeModels();
+    }, [localInitialized, models.length, Object.keys(llamaCliSettings).length]);
 
-              {/* Threading & CPU Configuration */}
-              <Card className="theme-nested-card theme-spacing-md">
-                <Card.Body className="p-3">
-                  <h6 className="theme-section-title">
-                    <i className="bi bi-cpu me-1"></i>
-                    Threading & CPU Configuration
-                  </h6>
+    // Stable callback functions
+    const handleChange = useCallback(
+        (field, value) => {
+            updateCliField(field, value);
 
-                  {renderFormField("Threads", "--threads", "ThreadsVal", {
-                    type: "number",
-                    value: llamaCliSettings.ThreadsVal,
-                    onChange: (value) => handleChange("ThreadsVal", value),
-                    min: "1",
-                    helperText: "Number of threads to use",
-                  })}
+            const tempSettings = { ...llamaCliSettings, [field]: value };
+            const validation = validateCliSettings(tempSettings);
+            setErrors(validation.errors);
 
-                  {renderFormField(
-                    "Threads Batch",
-                    "--threads-batch",
-                    "ThreadsBatchVal",
-                    {
-                      type: "number",
-                      value: llamaCliSettings.ThreadsBatchVal,
-                      onChange: (value) =>
-                        handleChange("ThreadsBatchVal", value),
-                      min: "1",
-                      helperText:
-                        "Number of threads to use for batch processing",
-                    },
-                  )}
+            // Reset save state when user makes changes
+            if (saveState !== 'idle') {
+                setSaveState('idle');
+                setSaveMessage('');
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+            }
+        },
+        [llamaCliSettings, updateCliField, validateCliSettings, saveState]
+    );
 
-                  {renderFormField("CPU Mask", "--cpu-mask", "CpuMaskVal", {
-                    type: "text",
-                    value: llamaCliSettings.CpuMaskVal,
-                    onChange: (value) => handleChange("CpuMaskVal", value),
-                    helperText: "CPU core mask for thread affinity",
-                  })}
+    const handlePromptCacheChange = useCallback(
+        (field, value) => {
+            if (!value.length) {
+                updateCliField(field, value);
+                return;
+            }
 
-                  {renderCheckboxField(
-                    "CPU Mask Strict",
-                    "--cpu-mask-strict",
-                    "CpuMaskStrictVal",
-                    llamaCliSettings.CpuMaskStrictVal,
-                    "Enforce strict CPU mask usage",
-                  )}
+            const basePath = appSettings?.PromptCachePath || "";
+            const fullPath = value.startsWith(basePath) ? value : basePath + value;
+            updateCliField(field, fullPath);
 
-                  {renderCheckboxField(
-                    "No KV Offload",
-                    "--no-kv-offload",
-                    "NoKvOffloadVal",
-                    llamaCliSettings.NoKvOffloadVal,
-                    "Disable KV cache offloading",
-                  )}
+            // Reset save state when user makes changes
+            if (saveState !== 'idle') {
+                setSaveState('idle');
+                setSaveMessage('');
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+            }
+        },
+        [updateCliField, appSettings?.PromptCachePath, saveState]
+    );
+
+    const handleModelLogChange = useCallback(
+        (field, value) => {
+            if (!value.length) {
+                updateCliField(field, value);
+                return;
+            }
+
+            const basePath = appSettings?.ModelLogPath || "";
+            const fullPath = value.startsWith(basePath) ? value : basePath + value;
+            updateCliField(field, fullPath);
+
+            // Reset save state when user makes changes
+            if (saveState !== 'idle') {
+                setSaveState('idle');
+                setSaveMessage('');
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+            }
+        },
+        [updateCliField, appSettings?.ModelLogPath, saveState]
+    );
+
+    const handleModelChange = useCallback(
+        (event) => {
+            const selectedId = event.target.value;
+            const selectedModelData = models.find((model) => model.FullPath === selectedId);
+
+            if (selectedModelData) {
+                const logFileName = `${appSettings?.ModelLogPath || ""}${selectedModelData.ModelName}.log`;
+
+                updateCliFields({
+                    ModelLogFileNameVal: logFileName,
+                    ModelFullPathVal: selectedId,
+                });
+
+                updateCliFormState({ selectedModel: selectedModelData.FullPath });
+            }
+
+            // Reset save state when user makes changes
+            if (saveState !== 'idle') {
+                setSaveState('idle');
+                setSaveMessage('');
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+            }
+        },
+        [models, appSettings?.ModelLogPath, updateCliFields, updateCliFormState, saveState]
+    );
+
+    const handleLoadSavedSetting = useCallback(
+        async (event) => {
+            const selectedIndex = event.target.value;
+            updateCliFormState({ selectedSavedSetting: selectedIndex });
+
+            if (!selectedIndex || selectedIndex === "") return;
+
+            try {
+                const loadedSettings = await loadSavedCliSetting(selectedIndex);
+
+                if (loadedSettings && loadedSettings.ModelFullPathVal) {
+                    updateCliFormState({ selectedModel: loadedSettings.ModelFullPathVal });
+                }
+
+                // Reset save state when user loads settings
+                if (saveState !== 'idle') {
+                    setSaveState('idle');
+                    setSaveMessage('');
+                    if (saveTimeoutRef.current) {
+                        clearTimeout(saveTimeoutRef.current);
+                    }
+                }
+            } catch (error) {
+                LogError("Failed to load saved setting: " + error);
+            }
+        },
+        [updateCliFormState, loadSavedCliSetting, saveState]
+    );
+
+    const handleSubmit = useCallback(
+        async (e) => {
+            e.preventDefault();
+
+            const validation = validateCliSettings();
+            setErrors(validation.errors);
+
+            if (!validation.isValid) {
+                LogError("Please fix validation errors before saving.");
+                setSaveState('error');
+                setSaveMessage('Please fix validation errors before saving.');
+                return;
+            }
+
+            try {
+                setSaveState('saving');
+                setSaveMessage('Saving CLI settings...');
+
+                await saveCliSettings(llamaCliSettings.Description, llamaCliSettings);
+
+                setSaveState('success');
+                setSaveMessage('CLI settings saved successfully!');
+
+                // Auto-hide success message after 3 seconds
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+                saveTimeoutRef.current = setTimeout(() => {
+                    setSaveState('idle');
+                    setSaveMessage('');
+                }, 3000);
+
+            } catch (error) {
+                setSaveState('error');
+                setSaveMessage('Failed to save CLI settings: ' + error);
+                LogError("Failed to save settings: " + error);
+            }
+        },
+        [llamaCliSettings, validateCliSettings, saveCliSettings]
+    );
+
+    const formatDate = useCallback((dateString) => {
+        if (!dateString) return "";
+
+        try {
+            const date = new Date(dateString);
+            return (
+                date.toLocaleDateString() +
+                " " +
+                date.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                })
+            );
+        } catch (error) {
+            LogError(`Error formatting date: ${error}`);
+            return dateString;
+        }
+    }, []);
+
+    // Render helpers - now stable with useCallback
+    const renderFormField = useCallback(
+        (label, cmdValue, fieldId, inputProps = {}) => {
+            const { helperText, value, onChange, type, options, ...cleanInputProps } = inputProps;
+
+            return (
+                <div className="theme-spacing-sm">
+                    <Row className="g-2 align-items-center">
+                        <Col md={3}>
+                            <Form.Label className="theme-form-label mb-0" column={"lg"}>
+                                {label}
+                            </Form.Label>
+                            <div
+                                style={{
+                                    fontSize: "0.7rem",
+                                    color: "var(--text-quaternary)",
+                                    fontFamily: "monospace",
+                                }}
+                            >
+                                {cmdValue || ""}
+                            </div>
+                        </Col>
+                        <Col md={6}>
+                            {options ? (
+                                <Form.Select
+                                    id={fieldId}
+                                    value={value ?? ""}
+                                    onChange={(e) => onChange(e.target.value)}
+                                    className="theme-form-control"
+                                    size="sm"
+                                    isInvalid={!!errors[fieldId]}
+                                    {...cleanInputProps}
+                                >
+                                    {options.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </Form.Select>
+                            ) : (
+                                <Form.Control
+                                    id={fieldId}
+                                    type={type}
+                                    value={value ?? ""}
+                                    onChange={(e) => {
+                                        let processedValue = e.target.value;
+
+                                        if (type === "number") {
+                                            if (processedValue === "") {
+                                                processedValue = "";
+                                            } else {
+                                                const isFloatField = [
+                                                    "TemperatureVal",
+                                                    "TopPVal",
+                                                    "MinPVal",
+                                                    "RepeatPenaltyVal",
+                                                    "MirostatLrVal",
+                                                    "MirostatEntVal",
+                                                    "RopeScaleVal",
+                                                    "RopeFreqBaseVal",
+                                                    "RopeFreqScaleVal",
+                                                    "YarnExtFactorVal",
+                                                    "YarnAttnFactorVal",
+                                                    "YarnBetaSlowVal",
+                                                    "YarnBetaFastVal",
+                                                    "DefragTholdVal",
+                                                    "XtcProbabilityVal",
+                                                    "XtcThresholdVal",
+                                                    "TypicalVal",
+                                                    "PresencePenaltyVal",
+                                                    "FrequencyPenaltyVal",
+                                                    "DryMultiplierVal",
+                                                    "DryBaseVal",
+                                                    "DynatempRangeVal",
+                                                    "DynatempExpVal",
+                                                    "KeepVal"
+                                                ].includes(fieldId);
+                                                processedValue = isFloatField
+                                                    ? parseFloat(processedValue)
+                                                    : parseInt(processedValue, 10);
+
+                                                if (isNaN(processedValue)) {
+                                                    processedValue = "";
+                                                }
+                                            }
+                                        }
+
+                                        onChange(processedValue);
+                                    }}
+                                    className="theme-form-control"
+                                    size="sm"
+                                    isInvalid={!!errors[fieldId]}
+                                    {...cleanInputProps}
+                                />
+                            )}
+                            {errors[fieldId] && (
+                                <Form.Control.Feedback type="invalid">
+                                    {errors[fieldId]}
+                                </Form.Control.Feedback>
+                            )}
+                        </Col>
+                        {helperText && (
+                            <Col md={3}>
+                                <small
+                                    style={{
+                                        color: "var(--text-quaternary)",
+                                        fontSize: "0.75rem",
+                                    }}
+                                >
+                                    {helperText}
+                                </small>
+                            </Col>
+                        )}
+                    </Row>
+                </div>
+            );
+        },
+        [errors]
+    );
+
+    const renderCheckboxField = useCallback(
+        (label, cmdValue, fieldId, isChecked, helperText) => (
+            <div className="theme-spacing-sm">
+                <Row className="g-2 align-items-center">
+                    <Col md={3}>
+                        <Form.Label className="theme-form-label mb-0" column={"lg"}>
+                            {label}
+                        </Form.Label>
+                        <div
+                            style={{
+                                fontSize: "0.7rem",
+                                color: "var(--text-quaternary)",
+                                fontFamily: "monospace",
+                            }}
+                        >
+                            {cmdValue || ""}
+                        </div>
+                    </Col>
+                    <Col md={2}>
+                        <div className="d-flex align-items-center gap-2">
+                            <Form.Check
+                                type="checkbox"
+                                id={fieldId}
+                                checked={!!isChecked}
+                                onChange={(e) => handleChange(fieldId, e.target.checked)}
+                                className="theme-form-check"
+                            />
+                            <Form.Label
+                                htmlFor={fieldId}
+                                className="theme-form-label mb-0"
+                                style={{ fontSize: "0.75rem" }}
+                            >
+                                Enabled
+                            </Form.Label>
+                        </div>
+                    </Col>
+                    {helperText && (
+                        <Col md={7}>
+                            <small
+                                style={{
+                                    color: "var(--text-quaternary)",
+                                    fontSize: "0.75rem",
+                                }}
+                            >
+                                {helperText}
+                            </small>
+                        </Col>
+                    )}
+                </Row>
+            </div>
+        ),
+        [handleChange]
+    );
+
+    // Show loading state if settings haven't loaded yet
+    if (settingsLoading) {
+        return (
+            <div className="theme-container">
+                <div
+                    className="d-flex justify-content-center align-items-center"
+                    style={{ minHeight: "300px" }}
+                >
+                    <div className="text-center">
+                        <Spinner
+                            animation="border"
+                            className="theme-loading-spinner"
+                            style={{ width: "2rem", height: "2rem" }}
+                        />
+                        <div className="theme-loading-text">Loading configuration...</div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="theme-container d-flex flex-column">
+            {/* Header */}
+            <Card
+                className="theme-header-card theme-spacing-sm"
+                style={{ flexShrink: 0 }}
+            >
+                <Card.Body className="py-2 px-3">
+                    <div className="d-flex align-items-center justify-content-between">
+                        <div className="d-flex align-items-center">
+                            <i
+                                className="bi bi-gear me-2 theme-icon"
+                                style={{ fontSize: "1.1rem" }}
+                            ></i>
+                            <div>
+                                <h5 className="mb-0" style={{ fontSize: "1rem" }}>
+                                    Llama CLI Settings
+                                </h5>
+                                <small style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
+                                    Configure LlamaCpp CLI parameters for AI inference and generation
+                                </small>
+                            </div>
+                        </div>
+                        <Button
+                            type="submit"
+                            form="cli-settings-form"
+                            disabled={isLoading}
+                            className="theme-btn-primary"
+                            size="sm"
+                        >
+                            {saveState === 'saving' ? (
+                                <>
+                                    <Spinner animation="border" size="sm" className="me-1" />
+                                    Saving...
+                                </>
+                            ) : saveState === 'success' ? (
+                                <>
+                                    <i className="bi bi-check-circle me-1" style={{ color: '#28a745' }}></i>
+                                    Saved!
+                                </>
+                            ) : (
+                                <>
+                                    <i className="bi bi-save me-1"></i>
+                                    Save Settings
+                                </>
+                            )}
+                        </Button>
+                    </div>
                 </Card.Body>
-              </Card>
+            </Card>
 
-              {/* Memory & Context Configuration */}
-              <Card className="theme-nested-card theme-spacing-md">
-                <Card.Body className="p-3">
-                  <h6 className="theme-section-title">
-                    <i className="bi bi-memory me-1"></i>
-                    Memory & Context Configuration
-                  </h6>
+            {/* Save Status Display */}
+            {saveState !== 'idle' && (
+                <Alert
+                    className={`theme-spacing-sm ${
+                        saveState === 'success' ? 'theme-alert-success' :
+                            saveState === 'error' ? 'theme-alert-danger' : 'theme-alert-info'
+                    }`}
+                    style={{ flexShrink: 0 }}
+                >
+                    <div className="d-flex align-items-center">
+                        {saveState === 'saving' && (
+                            <Spinner animation="border" size="sm" className="me-2" />
+                        )}
+                        {saveState === 'success' && (
+                            <i className="bi bi-check-circle-fill me-2" style={{ color: '#28a745' }}></i>
+                        )}
+                        {saveState === 'error' && (
+                            <i className="bi bi-exclamation-triangle-fill me-2" style={{ color: '#dc3545' }}></i>
+                        )}
+                        <span>{saveMessage}</span>
+                    </div>
+                </Alert>
+            )}
 
-                  {renderFormField("Context Size", "--ctx-size", "CtxSizeVal", {
-                    type: "number",
-                    value: llamaCliSettings.CtxSizeVal,
-                    onChange: (value) => handleChange("CtxSizeVal", value),
-                    min: "1",
-                    helperText: "Context window size in tokens",
-                  })}
+            {/* Error Display */}
+            {settingsError && (
+                <Alert
+                    className="theme-alert-danger theme-spacing-sm"
+                    style={{ flexShrink: 0 }}
+                >
+                    <Alert.Heading className="h6">
+                        <i className="bi bi-exclamation-triangle me-2"></i>
+                        Configuration Error
+                    </Alert.Heading>
+                    <small>Error loading settings: {settingsError}</small>
+                </Alert>
+            )}
 
-                  {renderFormField(
-                    "Batch Size",
-                    "--batch-size",
-                    "BatchSizeVal",
-                    {
-                      type: "number",
-                      value: llamaCliSettings.BatchSizeVal,
-                      onChange: (value) => handleChange("BatchSizeVal", value),
-                      min: "1",
-                      helperText: "Batch size for processing",
-                    },
-                  )}
+            {/* Main Form - Scrollable */}
+            <Card className="theme-main-card flex-grow-1 d-flex flex-column">
+                <Card.Body className="p-3 d-flex flex-column">
+                    <div className="flex-grow-1">
+                        <Form id="cli-settings-form" onSubmit={handleSubmit}>
+                            {/* Basic Configuration */}
+                            <div className="theme-spacing-md">
+                                <h6 className="theme-section-title">
+                                    <i className="bi bi-info-circle me-1"></i>
+                                    Basic Configuration
+                                </h6>
 
-                  {renderFormField(
-                    "UBatch Size",
-                    "--ubatch-size",
-                    "UbatchSizeVal",
-                    {
-                      type: "number",
-                      value: llamaCliSettings.UbatchSizeVal,
-                      onChange: (value) => handleChange("UbatchSizeVal", value),
-                      min: "1",
-                      helperText: "Micro-batch size for processing",
-                    },
-                  )}
+                                <Form.Group className="theme-spacing-sm">
+                                    <Form.Label className="theme-form-label" column={"lg"}>
+                                        Description *
+                                    </Form.Label>
+                                    <Form.Control
+                                        type="text"
+                                        value={llamaCliSettings.Description ?? ""}
+                                        onChange={(e) => handleChange("Description", e.target.value)}
+                                        placeholder="Enter a description for this CLI configuration"
+                                        className="theme-form-control"
+                                        size="sm"
+                                        isInvalid={!!errors.Description}
+                                    />
+                                    {errors.Description && (
+                                        <Form.Control.Feedback type="invalid">
+                                            {errors.Description}
+                                        </Form.Control.Feedback>
+                                    )}
+                                </Form.Group>
 
-                  {renderFormField("Keep Context", "--keep", "KeepVal", {
-                    type: "number",
-                    value: llamaCliSettings.KeepVal,
-                    onChange: (value) => handleChange("KeepVal", value),
-                    min: "0",
-                    helperText: "Number of tokens to keep from initial prompt",
-                  })}
+                                <Form.Group className="theme-spacing-sm">
+                                    <Form.Label className="theme-form-label" column={"lg"}>
+                                        Load Saved CLI Settings
+                                    </Form.Label>
+                                    <Form.Select
+                                        value={selectedSavedSetting}
+                                        onChange={handleLoadSavedSetting}
+                                        disabled={savedSettingsLoading}
+                                        className="theme-form-control"
+                                        size="sm"
+                                    >
+                                        <option value="">Select saved settings to load...</option>
+                                        {savedSettings.map((setting, index) => (
+                                            <option key={index} value={index}>
+                                                {setting.description ||
+                                                    setting.settings?.Description ||
+                                                    "Unnamed Setting"}
+                                                {setting.createdAt &&
+                                                    ` - ${formatDate(setting.createdAt)}`}
+                                            </option>
+                                        ))}
+                                    </Form.Select>
+                                    {savedSettingsLoading && (
+                                        <Form.Text
+                                            style={{
+                                                color: "var(--text-quaternary)",
+                                                fontSize: "0.75rem",
+                                            }}
+                                        >
+                                            <Spinner animation="border" size="sm" className="me-1" />
+                                            Loading saved settings...
+                                        </Form.Text>
+                                    )}
+                                </Form.Group>
 
-                  {renderCheckboxField(
-                    "Flash Attention",
-                    "--flash-attn",
-                    "FlashAttnVal",
-                    llamaCliSettings.FlashAttnVal,
-                    "Enable flash attention optimization",
-                  )}
+                                <Form.Group className="theme-spacing-sm">
+                                    <Form.Label className="theme-form-label" column={"lg"}>
+                                        Model Selection
+                                    </Form.Label>
+                                    <Form.Select
+                                        value={selectedModel}
+                                        onChange={handleModelChange}
+                                        disabled={models.length === 0}
+                                        className="theme-form-control"
+                                        size="sm"
+                                    >
+                                        <option value="">Select a model...</option>
+                                        {models.map((model) => (
+                                            <option key={model.id} value={model.FullPath}>
+                                                {model.ModelName} - {model.FullPath}
+                                            </option>
+                                        ))}
+                                    </Form.Select>
+                                </Form.Group>
+                            </div>
+
+                            {/* Essential Settings */}
+                            <Card className="theme-nested-card theme-spacing-md">
+                                <Card.Body className="p-3">
+                                    <h6 className="theme-section-title">
+                                        <i className="bi bi-file-text me-1"></i>
+                                        Essential Settings
+                                    </h6>
+
+                                    {renderFormField(
+                                        "Prompt Cache Path",
+                                        "--prompt-cache",
+                                        "PromptCacheVal",
+                                        {
+                                            type: "text",
+                                            value: llamaCliSettings.PromptCacheVal,
+                                            onChange: (value) =>
+                                                handlePromptCacheChange("PromptCacheVal", value),
+                                            helperText: "Path to prompt cache file for faster processing",
+                                        }
+                                    )}
+
+                                    {renderFormField(
+                                        "Log File",
+                                        "--log-file",
+                                        "ModelLogFileNameVal",
+                                        {
+                                            type: "text",
+                                            value: llamaCliSettings.ModelLogFileNameVal,
+                                            onChange: (value) =>
+                                                handleModelLogChange("ModelLogFileNameVal", value),
+                                            helperText: "Output logging file path",
+                                        }
+                                    )}
+                                </Card.Body>
+                            </Card>
+
+                            {/* Performance & Threading */}
+                            <Card className="theme-nested-card theme-spacing-md">
+                                <Card.Body className="p-3">
+                                    <h6 className="theme-section-title">
+                                        <i className="bi bi-speedometer2 me-1"></i>
+                                        Performance & Threading
+                                    </h6>
+
+                                    {renderFormField("Threads", "--threads (-t)", "ThreadsVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.ThreadsVal,
+                                        onChange: (value) => handleChange("ThreadsVal", value),
+                                        min: "1",
+                                        helperText: "Number of threads for generation (default: -1)",
+                                    })}
+
+                                    {renderFormField(
+                                        "Threads Batch",
+                                        "--threads-batch (-tb)",
+                                        "ThreadsBatchVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.ThreadsBatchVal,
+                                            onChange: (value) => handleChange("ThreadsBatchVal", value),
+                                            min: "1",
+                                            helperText:
+                                                "Threads for batch processing (default: same as --threads)",
+                                        }
+                                    )}
+                                </Card.Body>
+                            </Card>
+
+                            {/* Context & Batch Settings */}
+                            <Card className="theme-nested-card theme-spacing-md">
+                                <Card.Body className="p-3">
+                                    <h6 className="theme-section-title">
+                                        <i className="bi bi-layers me-1"></i>
+                                        Context & Batch Settings
+                                    </h6>
+
+                                    {renderFormField(
+                                        "Context Size",
+                                        "--ctx-size (-c)",
+                                        "CtxSizeVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.CtxSizeVal,
+                                            onChange: (value) => handleChange("CtxSizeVal", value),
+                                            min: "1",
+                                            helperText:
+                                                "Size of the prompt context (default: 4096, 0 = loaded from model)",
+                                        }
+                                    )}
+
+                                    {renderFormField("Predict Tokens", "--predict (-n)", "PredictVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.PredictVal,
+                                        onChange: (value) => handleChange("PredictVal", value),
+                                        helperText:
+                                            "Number of tokens to predict (default: -1, -1 = infinity, -2 = until context filled)",
+                                    })}
+
+                                    {renderFormField(
+                                        "Batch Size",
+                                        "--batch-size (-b)",
+                                        "BatchCmdVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.BatchCmdVal,
+                                            onChange: (value) => handleChange("BatchCmdVal", value),
+                                            min: "1",
+                                            helperText: "Logical maximum batch size (default: 2048)",
+                                        }
+                                    )}
+
+                                    {renderFormField(
+                                        "UBatch Size",
+                                        "--ubatch-size (-ub)",
+                                        "UBatchCmdVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.UBatchCmdVal,
+                                            onChange: (value) => handleChange("UBatchCmdVal", value),
+                                            min: "1",
+                                            helperText: "Physical maximum batch size (default: 512)",
+                                        }
+                                    )}
+
+                                    {renderFormField("Keep Tokens", "--keep", "KeepVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.KeepVal,
+                                        onChange: (value) => handleChange("KeepVal", value),
+                                        min: "0",
+                                        helperText:
+                                            "Number of tokens to keep from the initial prompt (default: 0, -1 = all)",
+                                    })}
+                                </Card.Body>
+                            </Card>
+
+                            {/* GPU Settings */}
+                            <Card className="theme-nested-card theme-spacing-md">
+                                <Card.Body className="p-3">
+                                    <h6 className="theme-section-title">
+                                        <i className="bi bi-gpu-card me-1"></i>
+                                        GPU Settings
+                                    </h6>
+
+                                    {renderFormField(
+                                        "GPU Layers",
+                                        "--gpu-layers (-ngl)",
+                                        "GPULayersVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.GPULayersVal,
+                                            onChange: (value) => handleChange("GPULayersVal", value),
+                                            min: "0",
+                                            helperText: "Number of layers to store in VRAM",
+                                        }
+                                    )}
+
+                                    {renderFormField(
+                                        "Split Mode",
+                                        "--split-mode (-sm)",
+                                        "SplitModeCmdVal",
+                                        {
+                                            value: llamaCliSettings.SplitModeCmdVal,
+                                            onChange: (value) => handleChange("SplitModeCmdVal", value),
+                                            options: [
+                                                { value: "", label: "Default" },
+                                                { value: "none", label: "None" },
+                                                { value: "layer", label: "Layer" },
+                                                { value: "row", label: "Row" },
+                                            ],
+                                            helperText: "How to split the model across multiple GPUs",
+                                        }
+                                    )}
+
+                                    {renderFormField("Main GPU", "--main-gpu (-mg)", "MainGPUVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.MainGPUVal,
+                                        onChange: (value) => handleChange("MainGPUVal", value),
+                                        min: "0",
+                                        helperText: "The GPU to use for the model (default: 0)",
+                                    })}
+                                </Card.Body>
+                            </Card>
+
+                            {/* Sampling Parameters */}
+                            <Card className="theme-nested-card theme-spacing-md">
+                                <Card.Body className="p-3">
+                                    <h6 className="theme-section-title">
+                                        <i className="bi bi-sliders me-1"></i>
+                                        Sampling Parameters
+                                    </h6>
+
+                                    {renderFormField("Random Seed", "--seed (-s)", "RandomSeedVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.RandomSeedVal,
+                                        onChange: (value) => handleChange("RandomSeedVal", value),
+                                        helperText: "RNG seed (default: -1, use random seed for -1)",
+                                    })}
+
+                                    {renderFormField("Temperature", "--temp", "TemperatureVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.TemperatureVal,
+                                        onChange: (value) => handleChange("TemperatureVal", value),
+                                        min: "0",
+                                        max: "2",
+                                        step: "0.1",
+                                        helperText: "Temperature (default: 0.8)",
+                                    })}
+
+                                    {renderFormField("Top-K", "--top-k", "TopKVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.TopKVal,
+                                        onChange: (value) => handleChange("TopKVal", value),
+                                        min: "0",
+                                        helperText: "Top-k sampling (default: 40, 0 = disabled)",
+                                    })}
+
+                                    {renderFormField("Top-P", "--top-p", "TopPVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.TopPVal,
+                                        onChange: (value) => handleChange("TopPVal", value),
+                                        min: "0",
+                                        max: "1",
+                                        step: "0.01",
+                                        helperText: "Top-p sampling (default: 0.9, 1.0 = disabled)",
+                                    })}
+
+                                    {renderFormField("Min-P", "--min-p", "MinPVal", {
+                                        type: "number",
+                                        value: llamaCliSettings.MinPVal,
+                                        onChange: (value) => handleChange("MinPVal", value),
+                                        min: "0",
+                                        max: "1",
+                                        step: "0.01",
+                                        helperText: "Min-p sampling (default: 0.1, 0.0 = disabled)",
+                                    })}
+
+                                    {renderFormField(
+                                        "Repeat Last N",
+                                        "--repeat-last-n",
+                                        "RepeatLastPenaltyVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.RepeatLastPenaltyVal,
+                                            onChange: (value) =>
+                                                handleChange("RepeatLastPenaltyVal", value),
+                                            min: "0",
+                                            helperText:
+                                                "Last n tokens to consider for penalize (default: 64, 0 = disabled, -1 = ctx_size)",
+                                        }
+                                    )}
+
+                                    {renderFormField(
+                                        "Repeat Penalty",
+                                        "--repeat-penalty",
+                                        "RepeatPenaltyVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.RepeatPenaltyVal,
+                                            onChange: (value) => handleChange("RepeatPenaltyVal", value),
+                                            min: "0",
+                                            step: "0.01",
+                                            helperText:
+                                                "Penalize repeat sequence of tokens (default: 1.0, 1.0 = disabled)",
+                                        }
+                                    )}
+
+                                    {renderFormField(
+                                        "Mirostat Learning Rate",
+                                        "--mirostat-lr",
+                                        "MirostatLrVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.MirostatLrVal,
+                                            onChange: (value) => handleChange("MirostatLrVal", value),
+                                            min: "0",
+                                            step: "0.01",
+                                            helperText:
+                                                "Mirostat learning rate, parameter eta (default: 0.1)",
+                                        }
+                                    )}
+
+                                    {renderFormField(
+                                        "Mirostat Entropy",
+                                        "--mirostat-ent",
+                                        "MirostatEntVal",
+                                        {
+                                            type: "number",
+                                            value: llamaCliSettings.MirostatEntVal,
+                                            onChange: (value) => handleChange("MirostatEntVal", value),
+                                            min: "0",
+                                            step: "0.1",
+                                            helperText:
+                                                "Mirostat target entropy, parameter tau (default: 5.0)",
+                                        }
+                                    )}
+                                </Card.Body>
+                            </Card>
+
+                            {/* System Resource Parameters */}
+                            <Card className="theme-nested-card theme-spacing-md">
+                                <Card.Body className="p-3">
+                                    <h6 className="theme-section-title">
+                                        <i className="bi bi-hdd me-1"></i>
+                                        System Resource Parameters
+                                    </h6>
+
+                                    {renderCheckboxField(
+                                        "Memory Lock",
+                                        "--mlock",
+                                        "MemLockCmdEnabled",
+                                        llamaCliSettings.MemLockCmdEnabled,
+                                        "Force system to keep model in RAM rather than swapping or compressing"
+                                    )}
+
+                                    {renderCheckboxField(
+                                        "No Memory Map",
+                                        "--no-mmap",
+                                        "NoMmapCmdEnabled",
+                                        llamaCliSettings.NoMmapCmdEnabled,
+                                        "Do not memory-map model (slower load but may reduce pageouts if not using mlock)"
+                                    )}
+
+                                    {renderCheckboxField(
+                                        "Flash Attention",
+                                        "--flash-attn (-fa)",
+                                        "FlashAttentionCmdEnabled",
+                                        llamaCliSettings.FlashAttentionCmdEnabled,
+                                        "Enable Flash Attention (default: disabled)"
+                                    )}
+
+                                    {renderCheckboxField(
+                                        "Log Disable",
+                                        "--log-disable",
+                                        "LogDisableCmdEnabled",
+                                        llamaCliSettings.LogDisableCmdEnabled,
+                                        "Log disable"
+                                    )}
+
+                                    {renderCheckboxField(
+                                        "Verbose Prompt",
+                                        "--verbose-prompt",
+                                        "VerbosePromptCmdEnabled",
+                                        llamaCliSettings.VerbosePromptCmdEnabled,
+                                        "Print a verbose prompt before generation (default: false)"
+                                    )}
+                                </Card.Body>
+                            </Card>
+
+                            {/* Add bottom padding to ensure last elements are fully visible */}
+                            <div style={{ height: "40px" }}></div>
+                        </Form>
+                    </div>
                 </Card.Body>
-              </Card>
-
-              {/* Generation Parameters */}
-              <Card className="theme-nested-card theme-spacing-md">
-                <Card.Body className="p-3">
-                  <h6 className="theme-section-title">
-                    <i className="bi bi-sliders me-1"></i>
-                    Generation Parameters
-                  </h6>
-
-                  {renderFormField("Temperature", "--temp", "TemperatureVal", {
-                    type: "number",
-                    value: llamaCliSettings.TemperatureVal,
-                    onChange: (value) => handleChange("TemperatureVal", value),
-                    min: "0",
-                    max: "2",
-                    step: "0.1",
-                    helperText: "Sampling temperature (0.0 to 2.0)",
-                  })}
-
-                  {renderFormField("Top-K", "--top-k", "TopKVal", {
-                    type: "number",
-                    value: llamaCliSettings.TopKVal,
-                    onChange: (value) => handleChange("TopKVal", value),
-                    min: "1",
-                    helperText: "Top-K sampling parameter",
-                  })}
-
-                  {renderFormField("Top-P", "--top-p", "TopPVal", {
-                    type: "number",
-                    value: llamaCliSettings.TopPVal,
-                    onChange: (value) => handleChange("TopPVal", value),
-                    min: "0",
-                    max: "1",
-                    step: "0.01",
-                    helperText: "Top-P (nucleus) sampling parameter",
-                  })}
-
-                  {renderFormField(
-                    "Repeat Penalty",
-                    "--repeat-penalty",
-                    "RepeatPenaltyVal",
-                    {
-                      type: "number",
-                      value: llamaCliSettings.RepeatPenaltyVal,
-                      onChange: (value) =>
-                        handleChange("RepeatPenaltyVal", value),
-                      min: "0",
-                      step: "0.01",
-                      helperText: "Penalty for token repetition",
-                    },
-                  )}
-
-                  {renderFormField(
-                    "Repeat Last N",
-                    "--repeat-last-n",
-                    "RepeatLastNVal",
-                    {
-                      type: "number",
-                      value: llamaCliSettings.RepeatLastNVal,
-                      onChange: (value) =>
-                        handleChange("RepeatLastNVal", value),
-                      min: "0",
-                      helperText:
-                        "Last N tokens to consider for repetition penalty",
-                    },
-                  )}
-
-                  {renderFormField("Seed", "--seed", "SeedVal", {
-                    type: "number",
-                    value: llamaCliSettings.SeedVal,
-                    onChange: (value) => handleChange("SeedVal", value),
-                    helperText: "Random seed for generation (-1 for random)",
-                  })}
-                </Card.Body>
-              </Card>
-
-              {/* File Paths */}
-              <Card className="theme-nested-card theme-spacing-md">
-                <Card.Body className="p-3">
-                  <h6 className="theme-section-title">
-                    <i className="bi bi-folder me-1"></i>
-                    File Paths
-                  </h6>
-
-                  {renderFormField(
-                    "Model Path",
-                    "--model",
-                    "ModelFullPathVal",
-                    {
-                      type: "text",
-                      value: llamaCliSettings.ModelFullPathVal,
-                      onChange: (value) =>
-                        handleChange("ModelFullPathVal", value),
-                      helperText: "Path to the model file",
-                    },
-                  )}
-
-                  {renderFormField(
-                    "Log File",
-                    "--log-file",
-                    "ModelLogFileNameVal",
-                    {
-                      type: "text",
-                      value: llamaCliSettings.ModelLogFileNameVal,
-                      onChange: (value) =>
-                        handleModelLogChange("ModelLogFileNameVal", value),
-                      helperText: "Path to log file",
-                    },
-                  )}
-
-                  {renderFormField(
-                    "Prompt Cache",
-                    "--prompt-cache",
-                    "PromptCacheVal",
-                    {
-                      type: "text",
-                      value: llamaCliSettings.PromptCacheVal,
-                      onChange: (value) =>
-                        handleChange("PromptCacheVal", value),
-                      helperText: "Prompt cache file name",
-                    },
-                  )}
-                </Card.Body>
-              </Card>
-
-              {/* Advanced Options */}
-              <Card className="theme-nested-card theme-spacing-md">
-                <Card.Body className="p-3">
-                  <h6 className="theme-section-title">
-                    <i className="bi bi-gear-wide-connected me-1"></i>
-                    Advanced Options
-                  </h6>
-
-                  {renderCheckboxField(
-                    "Verbose",
-                    "--verbose",
-                    "VerboseVal",
-                    llamaCliSettings.VerboseVal,
-                    "Enable verbose output",
-                  )}
-
-                  {renderCheckboxField(
-                    "Log Disable",
-                    "--log-disable",
-                    "LogDisableVal",
-                    llamaCliSettings.LogDisableVal,
-                    "Disable logging",
-                  )}
-
-                  {renderCheckboxField(
-                    "Simple IO",
-                    "--simple-io",
-                    "SimpleIoVal",
-                    llamaCliSettings.SimpleIoVal,
-                    "Use simple input/output mode",
-                  )}
-
-                  {renderCheckboxField(
-                    "Continuous Batching",
-                    "--cont-batching",
-                    "ContBatchingVal",
-                    llamaCliSettings.ContBatchingVal,
-                    "Enable continuous batching",
-                  )}
-
-                  {renderFormField(
-                    "GPU Layers",
-                    "--gpu-layers",
-                    "GpuLayersVal",
-                    {
-                      type: "number",
-                      value: llamaCliSettings.GpuLayersVal,
-                      onChange: (value) => handleChange("GpuLayersVal", value),
-                      min: "0",
-                      helperText: "Number of layers to offload to GPU",
-                    },
-                  )}
-
-                  {renderFormField("Main GPU", "--main-gpu", "MainGpuVal", {
-                    type: "number",
-                    value: llamaCliSettings.MainGpuVal,
-                    onChange: (value) => handleChange("MainGpuVal", value),
-                    min: "0",
-                    helperText: "Main GPU device ID",
-                  })}
-                </Card.Body>
-              </Card>
-
-              {/* Add bottom padding to ensure last elements are fully visible */}
-              <div style={{ height: "40px" }}></div>
-            </Form>
-          </div>
-        </Card.Body>
-      </Card>
-    </div>
-  );
+            </Card>
+        </div>
+    );
 };

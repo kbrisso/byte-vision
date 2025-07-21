@@ -10,6 +10,7 @@ import { createInferenceSlice } from "./InferenceStateSlice.jsx";
 import { createParserSlice } from "./DocumentParserSlice.jsx";
 import { createSettingsSlice } from "./SettingsSliceManager.jsx";
 import { createUISlice } from "./UISliceManager.jsx";
+import {LogInfo} from "../wailsjs/runtime/runtime.js";
 
 // Store configuration
 const storeConfig = {
@@ -52,9 +53,11 @@ const storeConfig = {
   // Storage options
   storage: {
     getItem: (name) => {
+      LogInfo(`Getting name ${name} from localStorage`)
       const str = localStorage.getItem(name);
       if (!str) return null;
       try {
+        LogInfo(`Getting str ${str} from localStorage`)
         return JSON.parse(str);
       } catch {
         return null;
@@ -213,9 +216,25 @@ const selectParserState = (state) => ({
 });
 
 const selectSettingsState = (state) => ({
+  // Settings
   settings: state.settings,
   settingsLoading: state.settingsLoading,
-  // Actions
+  settingsError: state.settingsError,
+  settingsInitialized: state.settingsInitialized,
+
+  // Models
+  models: state.models,
+  modelsLoading: state.modelsLoading,
+
+  // Saved settings
+  savedCliSettings: state.savedCliSettings,
+  savedEmbedSettings: state.savedEmbedSettings,
+  savedSettingsLoading: state.savedSettingsLoading,
+
+  // Form state
+  formState: state.formState,
+
+  // Basic actions
   setSettings: state.setSettings,
   updateLlamaCliSettings: state.updateLlamaCliSettings,
   updateLlamaEmbedSettings: state.updateLlamaEmbedSettings,
@@ -223,11 +242,44 @@ const selectSettingsState = (state) => ({
   updateAppSettings: state.updateAppSettings,
   setSettingsLoading: state.setSettingsLoading,
   setSettingsError: state.setSettingsError,
-  loadSettings: state.loadSettings,
-  saveSettings: state.saveSettings,
-  settingsError: state.settingsError,
-});
+  setSettingsInitialized: state.setSettingsInitialized,
+  setModels: state.setModels,
+  setModelsLoading: state.setModelsLoading,
+  setSavedCliSettings: state.setSavedCliSettings,
+  setSavedEmbedSettings: state.setSavedEmbedSettings,
+  setSavedSettingsLoading: state.setSavedSettingsLoading,
+  initialized: state.initialized,
+  setInitialized: state.setInitialized,
 
+  // Form actions
+  updateCliFormState: state.updateCliFormState,
+  updateEmbedFormState: state.updateEmbedFormState,
+
+  // Complex actions
+  loadDefaultSettings: state.loadDefaultSettings,
+  loadModels: state.loadModels,
+  loadSavedCliSettings: state.loadSavedCliSettings,
+  loadSavedEmbedSettings: state.loadSavedEmbedSettings,
+  saveCliSettings: state.saveCliSettings,
+  saveEmbedSettings: state.saveEmbedSettings,
+
+  // Field updates
+  updateCliField: state.updateCliField,
+  updateCliFields: state.updateCliFields,
+  updateEmbedField: state.updateEmbedField,
+  updateEmbedFields: state.updateEmbedFields,
+
+  // Load saved settings
+  loadSavedCliSetting: state.loadSavedCliSetting,
+  loadSavedEmbedSetting: state.loadSavedEmbedSetting,
+
+  // Validation
+  validateCliSettings: state.validateCliSettings,
+  validateEmbedSettings: state.validateEmbedSettings,
+
+  // Reset
+  resetSettings: state.resetSettings,
+});
 const selectUIState = (state) => ({
   sidebarCollapsed: state.sidebarCollapsed,
   activeTab: state.activeTab,

@@ -12,7 +12,7 @@ import "../public/main.css";
 
 import PDFDocumentViewer from "./PDFDocumentViewer";
 import { LEGAL_KEYWORDS, DOC_PROMPTS } from "./CommonUtils.jsx";
-import {useDocumentState, useInferenceState} from "./StoreConfig.jsx";
+import {useInferenceState} from "./StoreConfig.jsx";
 
 // PDF Report Component for Document Analysis
 const PDFReportDocument = ({ reportData }) => (
@@ -992,7 +992,7 @@ const DocumentQuestionModal = ({
             <div className="card-body">
               <pre
                 className="bg-secondary p-3 rounded text-light"
-                style={{ fontSize: "0.85rem", whiteSpace: "pre-wrap" }}
+                style={{ fontSize: "0.8rem", whiteSpace: "pre-wrap" }}
               >
                 {selectedHistoryItem.embedPrompt || "No embedding prompt"}
               </pre>
@@ -1006,7 +1006,7 @@ const DocumentQuestionModal = ({
             <div className="card-body">
               <pre
                 className="bg-secondary p-3 rounded text-light"
-                style={{ fontSize: "0.85rem", whiteSpace: "pre-wrap" }}
+                style={{ fontSize: "0.8rem", whiteSpace: "pre-wrap" }}
               >
                 {selectedHistoryItem.docPrompt || "No document query"}
               </pre>
@@ -1018,11 +1018,12 @@ const DocumentQuestionModal = ({
               <h6 className="mb-0">Response</h6>
             </div>
             <div className="card-body">
-              <div style={{ fontSize: "0.9rem", lineHeight: "1.5" }}>
-                {formatMessageText(
-                  selectedHistoryItem.response || "No response",
-                )}
-              </div>
+              <pre
+                  className="bg-dark p-3 rounded"
+                  style={{ fontSize: "0.8rem", lineHeight:"1.4",whiteSpace: "pre-wrap" }}
+              >
+                {selectedHistoryItem.response || "No document query"}
+              </pre>
             </div>
           </div>
         </div>

@@ -16,4 +16,5 @@ byte-vision-cfg.env
 /frontend/build/*
 /frontend/wailsjs/*
 !frontend/src/*
+claude.md
 

@@ -171,7 +171,7 @@ func ParseDefaultLlamaCliEnv() LlamaCliArgs {
 		SamplersCmd:           os.Getenv("SamplersCmd"),
 		SamplersVal:           os.Getenv("SamplersVal"),
 		RandomSeedCmd:         os.Getenv("RandomSeedCmd"),
-		RandomSeedCmdVal:      os.Getenv("RandomSeedCmdVal"),
+		RandomSeedVal:         os.Getenv("RandomSeedVal"),
 		SamplingSeqCmd:        os.Getenv("SamplingSeqCmd"),
 		SamplingSeqVal:        os.Getenv("SamplingSeqVal"),
 		IgnoreEosCmd:          os.Getenv("IgnoreEosCmd"),
@@ -663,7 +663,7 @@ func LlamaCliStructToArgs(args LlamaCliArgs) []string {
 
 	// ----- sampling params -----
 	addCmdValPair(args.SamplersCmd, args.SamplersVal)
-	addCmdValPair(args.RandomSeedCmd, args.RandomSeedCmdVal)
+	addCmdValPair(args.RandomSeedCmd, args.RandomSeedVal)
 	addCmdValPair(args.SamplingSeqCmd, args.SamplingSeqVal)
 	addCmdBoolPair(args.IgnoreEosCmd, args.IgnoreEosCmdEnabled)
 	addCmdValPair(args.TemperatureCmd, args.TemperatureVal)
@@ -1058,7 +1058,7 @@ type LlamaCliArgs struct {
 	SamplersCmd           string `json:"SamplersCmd"`
 	SamplersVal           string `json:"SamplersVal"`
 	RandomSeedCmd         string `json:"RandomSeedCmd"`
-	RandomSeedCmdVal      string `json:"RandomSeedCmdVal"`
+	RandomSeedVal         string `json:"RandomSeedVal"`
 	SamplingSeqCmd        string `json:"SamplingSeqCmd"`
 	SamplingSeqVal        string `json:"SamplingSeqVal"`
 	IgnoreEosCmd          string `json:"IgnoreEosCmd"`
