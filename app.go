@@ -11,8 +11,10 @@ import (
 )
 
 type App struct {
-	ctx            context.Context
-	cancelFunc     context.CancelFunc // Add cancel function
+	ctx            context.Context // Original Wails context
+	wailsCtx       context.Context // Store the original Wails context
+	cancelFunc     context.CancelFunc
+	operationCtx   context.Context // Separate context for operations
 	log            logger.Logger
 	llamaCliArgs   *LlamaCliArgs
 	llamaEmbedArgs *LlamaEmbedArgs
@@ -30,21 +32,21 @@ func (a *App) CancelProcess() string {
 	return "No active process to cancel"
 }
 
-// Startup Update to create cancelable context
+// Startup Update to store both contexts
 func (a *App) Startup(ctx context.Context) {
-	// Create a cancelable context for operations
-	cancelableCtx, cancel := context.WithCancel(ctx)
-	a.ctx = cancelableCtx
-	a.cancelFunc = cancel
-	a.SetupEventListeners()
+	a.log.Info("App startup called")
+	a.ctx = ctx
 
+	a.log.Info("Setting up event listeners...")
+	a.SetupEventListeners()
+	a.log.Info("Startup complete")
 }
 
-// Reset context after operations complete
+// Reset context for operations only
 func (a *App) resetContext() {
-	parentCtx := context.Background()
-	cancelableCtx, cancel := context.WithCancel(parentCtx)
-	a.ctx = cancelableCtx
+	// Create a cancelable context from the original Wails context
+	cancelableCtx, cancel := context.WithCancel(a.wailsCtx)
+	a.operationCtx = cancelableCtx
 	a.cancelFunc = cancel
 }
 
@@ -62,9 +64,11 @@ func NewApp(logger logger.Logger, llamaCliArgs *LlamaCliArgs, llamaEmbedArgs *Ll
 func (a *App) Shutdown(ctx context.Context) {
 	a.ctx = ctx
 }
+
 func (a *App) Domready(ctx context.Context) {
-	a.ctx = ctx
+	a.wailsCtx = ctx
 }
+
 func (a *App) BeforeClose(ctx context.Context) (prevent bool) {
 	dialog, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
 		Type:    runtime.QuestionDialog,

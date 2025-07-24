@@ -127,12 +127,29 @@ export const LlamaCliSettingsForm = () => {
         initializeModels();
     }, [localInitialized, models.length, Object.keys(llamaCliSettings).length]);
 
+    const handleNumericChange = useCallback(
+        (field) => (event) => {
+            const value = event.target.value;
+            // Convert to string immediately to ensure compatibility
+            const stringValue = value === '' ? '' : String(value);
+            handleChange(field, stringValue);
+        },
+        [handleChange]
+    );
+
+    // Add this helper function at the top of your component
+    const convertToString = (value) => {
+        if (value === null || value === undefined) return "";
+        return String(value);
+    };
     // Stable callback functions
     const handleChange = useCallback(
         (field, value) => {
-            updateCliField(field, value);
+            // Convert numeric values to strings for Go backend compatibility
+            const stringValue = convertToString(value);
+            updateCliField(field, stringValue);
 
-            const tempSettings = { ...llamaCliSettings, [field]: value };
+            const tempSettings = { ...llamaCliSettings, [field]: stringValue };
             const validation = validateCliSettings(tempSettings);
             setErrors(validation.errors);
 
@@ -147,6 +164,7 @@ export const LlamaCliSettingsForm = () => {
         },
         [llamaCliSettings, updateCliField, validateCliSettings, saveState]
     );
+
 
     const handlePromptCacheChange = useCallback(
         (field, value) => {
@@ -250,6 +268,8 @@ export const LlamaCliSettingsForm = () => {
         },
         [updateCliFormState, loadSavedCliSetting, saveState]
     );
+
+
 
     const handleSubmit = useCallback(
         async (e) => {
@@ -730,7 +750,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Threads", "--threads (-t)", "ThreadsVal", {
                                         type: "number",
                                         value: llamaCliSettings.ThreadsVal,
-                                        onChange: (value) => handleChange("ThreadsVal", value),
+                                        onChange: handleNumericChange('ThreadsVal'),
                                         min: "1",
                                         helperText: "Number of threads for generation (default: -1)",
                                     })}
@@ -766,7 +786,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.CtxSizeVal,
-                                            onChange: (value) => handleChange("CtxSizeVal", value),
+                                            onChange:handleNumericChange('CtxSizeVal'),
                                             min: "1",
                                             helperText:
                                                 "Size of the prompt context (default: 4096, 0 = loaded from model)",
@@ -776,7 +796,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Predict Tokens", "--predict (-n)", "PredictVal", {
                                         type: "number",
                                         value: llamaCliSettings.PredictVal,
-                                        onChange: (value) => handleChange("PredictVal", value),
+                                        onChange: handleNumericChange('PredictVal'),
                                         helperText:
                                             "Number of tokens to predict (default: -1, -1 = infinity, -2 = until context filled)",
                                     })}
@@ -884,7 +904,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Temperature", "--temp", "TemperatureVal", {
                                         type: "number",
                                         value: llamaCliSettings.TemperatureVal,
-                                        onChange: (value) => handleChange("TemperatureVal", value),
+                                        onChange: handleNumericChange('TemperatureVal'),
                                         min: "0",
                                         max: "2",
                                         step: "0.1",
@@ -894,7 +914,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Top-K", "--top-k", "TopKVal", {
                                         type: "number",
                                         value: llamaCliSettings.TopKVal,
-                                        onChange: (value) => handleChange("TopKVal", value),
+                                        onChange: handleNumericChange('TopKVal'),
                                         min: "0",
                                         helperText: "Top-k sampling (default: 40, 0 = disabled)",
                                     })}
@@ -902,7 +922,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Top-P", "--top-p", "TopPVal", {
                                         type: "number",
                                         value: llamaCliSettings.TopPVal,
-                                        onChange: (value) => handleChange("TopPVal", value),
+                                        onChange: handleNumericChange('TopPVal'),
                                         min: "0",
                                         max: "1",
                                         step: "0.01",
@@ -912,7 +932,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Min-P", "--min-p", "MinPVal", {
                                         type: "number",
                                         value: llamaCliSettings.MinPVal,
-                                        onChange: (value) => handleChange("MinPVal", value),
+                                        onChange: handleNumericChange('MinPVal'),
                                         min: "0",
                                         max: "1",
                                         step: "0.01",
@@ -926,8 +946,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.RepeatLastPenaltyVal,
-                                            onChange: (value) =>
-                                                handleChange("RepeatLastPenaltyVal", value),
+                                            onChange: handleNumericChange('RepeatLastPenaltyVal'),
                                             min: "0",
                                             helperText:
                                                 "Last n tokens to consider for penalize (default: 64, 0 = disabled, -1 = ctx_size)",
@@ -941,7 +960,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.RepeatPenaltyVal,
-                                            onChange: (value) => handleChange("RepeatPenaltyVal", value),
+                                            onChange: handleNumericChange('RepeatPenaltyVal'),
                                             min: "0",
                                             step: "0.01",
                                             helperText:
@@ -956,7 +975,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.MirostatLrVal,
-                                            onChange: (value) => handleChange("MirostatLrVal", value),
+                                            onChange: handleNumericChange('MirostatLrVal'),
                                             min: "0",
                                             step: "0.01",
                                             helperText:
@@ -971,7 +990,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.MirostatEntVal,
-                                            onChange: (value) => handleChange("MirostatEntVal", value),
+                                            onChange: handleNumericChange('MirostatEntVal'),
                                             min: "0",
                                             step: "0.1",
                                             helperText:
