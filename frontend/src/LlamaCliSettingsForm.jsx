@@ -127,16 +127,6 @@ export const LlamaCliSettingsForm = () => {
         initializeModels();
     }, [localInitialized, models.length, Object.keys(llamaCliSettings).length]);
 
-    const handleNumericChange = useCallback(
-        (field) => (event) => {
-            const value = event.target.value;
-            // Convert to string immediately to ensure compatibility
-            const stringValue = value === '' ? '' : String(value);
-            handleChange(field, stringValue);
-        },
-        [handleChange]
-    );
-
     // Add this helper function at the top of your component
     const convertToString = (value) => {
         if (value === null || value === undefined) return "";
@@ -165,6 +155,15 @@ export const LlamaCliSettingsForm = () => {
         [llamaCliSettings, updateCliField, validateCliSettings, saveState]
     );
 
+    const handleNumericChange = useCallback(
+        (field) => (event) => {
+            const value = event.target.value;
+            // Convert to string immediately to ensure compatibility
+            const stringValue = value === '' ? '' : String(value);
+            handleChange(field, stringValue);
+        },
+        [handleChange]
+    );
 
     const handlePromptCacheChange = useCallback(
         (field, value) => {
@@ -376,49 +375,14 @@ export const LlamaCliSettingsForm = () => {
                                     type={type}
                                     value={value ?? ""}
                                     onChange={(e) => {
-                                        let processedValue = e.target.value;
-
+                                        // Fix: Handle the event properly
                                         if (type === "number") {
-                                            if (processedValue === "") {
-                                                processedValue = "";
-                                            } else {
-                                                const isFloatField = [
-                                                    "TemperatureVal",
-                                                    "TopPVal",
-                                                    "MinPVal",
-                                                    "RepeatPenaltyVal",
-                                                    "MirostatLrVal",
-                                                    "MirostatEntVal",
-                                                    "RopeScaleVal",
-                                                    "RopeFreqBaseVal",
-                                                    "RopeFreqScaleVal",
-                                                    "YarnExtFactorVal",
-                                                    "YarnAttnFactorVal",
-                                                    "YarnBetaSlowVal",
-                                                    "YarnBetaFastVal",
-                                                    "DefragTholdVal",
-                                                    "XtcProbabilityVal",
-                                                    "XtcThresholdVal",
-                                                    "TypicalVal",
-                                                    "PresencePenaltyVal",
-                                                    "FrequencyPenaltyVal",
-                                                    "DryMultiplierVal",
-                                                    "DryBaseVal",
-                                                    "DynatempRangeVal",
-                                                    "DynatempExpVal",
-                                                    "KeepVal"
-                                                ].includes(fieldId);
-                                                processedValue = isFloatField
-                                                    ? parseFloat(processedValue)
-                                                    : parseInt(processedValue, 10);
-
-                                                if (isNaN(processedValue)) {
-                                                    processedValue = "";
-                                                }
-                                            }
+                                            // Convert to string for Go backend compatibility
+                                            const stringValue = e.target.value === '' ? '' : String(e.target.value);
+                                            onChange(stringValue);
+                                        } else {
+                                            onChange(e.target.value);
                                         }
-
-                                        onChange(processedValue);
                                     }}
                                     className="theme-form-control"
                                     size="sm"
@@ -450,7 +414,6 @@ export const LlamaCliSettingsForm = () => {
         },
         [errors]
     );
-
     const renderCheckboxField = useCallback(
         (label, cmdValue, fieldId, isChecked, helperText) => (
             <div className="theme-spacing-sm">
@@ -750,7 +713,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Threads", "--threads (-t)", "ThreadsVal", {
                                         type: "number",
                                         value: llamaCliSettings.ThreadsVal,
-                                        onChange: handleNumericChange('ThreadsVal'),
+                                        onChange: (value) => handleChange("ThreadsVal", value),
                                         min: "1",
                                         helperText: "Number of threads for generation (default: -1)",
                                     })}
@@ -786,7 +749,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.CtxSizeVal,
-                                            onChange:handleNumericChange('CtxSizeVal'),
+                                            onChange: (value) => handleChange("CtxSizeVal", value),
                                             min: "1",
                                             helperText:
                                                 "Size of the prompt context (default: 4096, 0 = loaded from model)",
@@ -796,7 +759,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Predict Tokens", "--predict (-n)", "PredictVal", {
                                         type: "number",
                                         value: llamaCliSettings.PredictVal,
-                                        onChange: handleNumericChange('PredictVal'),
+                                        onChange: (value) => handleChange("PredictVal", value),
                                         helperText:
                                             "Number of tokens to predict (default: -1, -1 = infinity, -2 = until context filled)",
                                     })}
@@ -904,7 +867,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Temperature", "--temp", "TemperatureVal", {
                                         type: "number",
                                         value: llamaCliSettings.TemperatureVal,
-                                        onChange: handleNumericChange('TemperatureVal'),
+                                        onChange: (value) => handleChange("TemperatureVal", value),
                                         min: "0",
                                         max: "2",
                                         step: "0.1",
@@ -914,7 +877,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Top-K", "--top-k", "TopKVal", {
                                         type: "number",
                                         value: llamaCliSettings.TopKVal,
-                                        onChange: handleNumericChange('TopKVal'),
+                                        onChange: (value) => handleChange("TopKVal", value),
                                         min: "0",
                                         helperText: "Top-k sampling (default: 40, 0 = disabled)",
                                     })}
@@ -922,7 +885,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Top-P", "--top-p", "TopPVal", {
                                         type: "number",
                                         value: llamaCliSettings.TopPVal,
-                                        onChange: handleNumericChange('TopPVal'),
+                                        onChange: (value) => handleChange("TopPVal", value),
                                         min: "0",
                                         max: "1",
                                         step: "0.01",
@@ -932,7 +895,7 @@ export const LlamaCliSettingsForm = () => {
                                     {renderFormField("Min-P", "--min-p", "MinPVal", {
                                         type: "number",
                                         value: llamaCliSettings.MinPVal,
-                                        onChange: handleNumericChange('MinPVal'),
+                                        onChange: (value) => handleChange("MinPVal", value),
                                         min: "0",
                                         max: "1",
                                         step: "0.01",
@@ -946,7 +909,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.RepeatLastPenaltyVal,
-                                            onChange: handleNumericChange('RepeatLastPenaltyVal'),
+                                            onChange: (value) => handleChange("RepeatLastPenaltyVal", value),
                                             min: "0",
                                             helperText:
                                                 "Last n tokens to consider for penalize (default: 64, 0 = disabled, -1 = ctx_size)",
@@ -960,7 +923,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.RepeatPenaltyVal,
-                                            onChange: handleNumericChange('RepeatPenaltyVal'),
+                                            onChange: (value) => handleChange("RepeatPenaltyVal", value),
                                             min: "0",
                                             step: "0.01",
                                             helperText:
@@ -975,7 +938,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.MirostatLrVal,
-                                            onChange: handleNumericChange('MirostatLrVal'),
+                                            onChange: (value) => handleChange("MirostatLrVal", value),
                                             min: "0",
                                             step: "0.01",
                                             helperText:
@@ -990,7 +953,7 @@ export const LlamaCliSettingsForm = () => {
                                         {
                                             type: "number",
                                             value: llamaCliSettings.MirostatEntVal,
-                                            onChange: handleNumericChange('MirostatEntVal'),
+                                            onChange: (value) => handleChange("MirostatEntVal", value),
                                             min: "0",
                                             step: "0.1",
                                             helperText:
