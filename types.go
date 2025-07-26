@@ -1481,20 +1481,6 @@ type ReportPromptTemplate struct {
 	ReportDate      string
 	AssistantPrompt string
 }
-type SystemPrompt struct {
-	SystemPrompt    string
-	UserPrompt      string
-	Input           string
-	AssistantPrompt string
-}
-type Template struct {
-	Text string
-}
-type InstPrompt struct {
-	InstStart string
-	Input     string
-	InstEnd   string
-}
 
 type PDFLoader struct {
 	loader Loader

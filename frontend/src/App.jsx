@@ -5,8 +5,9 @@ import DocumentSettings from "./DocumentSettings.jsx";
 import InferenceCompletionForm from "./InferenceCompletionForm.jsx";
 import Settings from "./Settings.jsx";
 import DocumentSearchForm from "./DocumentSearchForm.jsx";
+
 import "../public/main.css";
-import {useStore} from "zustand/react";
+// eslint-disable-next-line import/order
 import {useEffect} from "react";
 
 const App = () => {

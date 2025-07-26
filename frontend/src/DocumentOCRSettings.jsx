@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Alert, Button, Card, Form, Spinner } from "react-bootstrap";
 
-import { ChooseDocParseDir, OCRFromPDF, CancelProcess } from "../wailsjs/go/main/App.js";
+import { ChooseFile, OCRFromPDF, CancelProcess } from "../wailsjs/go/main/App.js";
 import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
 import "../public/main.css";
 
@@ -32,7 +32,7 @@ export const DocumentOCRSettings = () => {
       setAbortController(controller);
 
       // Select file (image or PDF)
-      const filePath = await ChooseDocParseDir();
+      const filePath = await ChooseFile();
       if (!filePath || filePath.startsWith("Error:")) {
         if (filePath && filePath.startsWith("Error:")) {
           setError(filePath);

@@ -358,48 +358,14 @@ export const LlamaEmbedSettingsForm = () => {
                                     type={type}
                                     value={value ?? ""}
                                     onChange={(e) => {
-                                        let processedValue = e.target.value;
-
+                                        // Fix: Handle the event properly
                                         if (type === "number") {
-                                            if (processedValue === "") {
-                                                processedValue = "";
-                                            } else {
-                                                const isFloatField = [
-                                                    "EmbedTemperatureVal",
-                                                    "EmbedTopPVal",
-                                                    "EmbedMinPVal",
-                                                    "EmbedRepeatPenaltyVal",
-                                                    "EmbedMirostatLrVal",
-                                                    "EmbedMirostatEntVal",
-                                                    "EmbedRopeScaleVal",
-                                                    "EmbedRopeFreqBaseVal",
-                                                    "EmbedRopeFreqScaleVal",
-                                                    "EmbedYarnExtFactorVal",
-                                                    "EmbedYarnAttnFactorVal",
-                                                    "EmbedYarnBetaSlowVal",
-                                                    "EmbedYarnBetaFastVal",
-                                                    "EmbedDefragTholdVal",
-                                                    "EmbedXtcProbabilityVal",
-                                                    "EmbedXtcThresholdVal",
-                                                    "EmbedTypicalVal",
-                                                    "EmbedPresencePenaltyVal",
-                                                    "EmbedFrequencyPenaltyVal",
-                                                    "EmbedDryMultiplierVal",
-                                                    "EmbedDryBaseVal",
-                                                    "EmbedDynatempRangeVal",
-                                                    "EmbedDynatempExpVal",
-                                                ].includes(fieldId);
-                                                processedValue = isFloatField
-                                                    ? parseFloat(processedValue)
-                                                    : parseInt(processedValue, 10);
-
-                                                if (isNaN(processedValue)) {
-                                                    processedValue = "";
-                                                }
-                                            }
+                                            // Convert to string for Go backend compatibility
+                                            const stringValue = e.target.value === '' ? '' : String(e.target.value);
+                                            onChange(stringValue);
+                                        } else {
+                                            onChange(e.target.value);
                                         }
-
-                                        onChange(processedValue);
                                     }}
                                     className="theme-form-control"
                                     size="sm"

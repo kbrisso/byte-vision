@@ -117,8 +117,8 @@ func (a *App) GetPDFAsBase64(filePath string) (string, error) {
 	return base64.StdEncoding.EncodeToString(data), nil
 }
 
-// ChooseDocParseDir opens a directory selection dialog
-func (a *App) ChooseDocParseDir() string {
+// ChooseFile opens a directory selection dialog
+func (a *App) ChooseFile() string {
 	opts := runtime.OpenDialogOptions{
 		DefaultDirectory: a.appArgs.DocumentPath,
 		Title:            "Select a file",

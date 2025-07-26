@@ -11,7 +11,7 @@ import {
   Spinner,
 } from "react-bootstrap";
 
-import { ChooseDocParseDir, CancelProcess } from "../wailsjs/go/main/App.js";
+import { ChooseFile, CancelProcess } from "../wailsjs/go/main/App.js";
 import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
 import "../public/main.css";
 
@@ -291,7 +291,7 @@ export const DocumentParserSettings = () => {
                     <Button
                         className="theme-input-group-button"
                         onClick={() => {
-                          ChooseDocParseDir().then((dir) => {
+                          ChooseFile().then((dir) => {
                             if (dir && !dir.includes("Error")) {
                               setFormData({ ...formData, sourceLocation: dir });
                             }

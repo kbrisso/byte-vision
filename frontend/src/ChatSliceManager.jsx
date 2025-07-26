@@ -1,8 +1,11 @@
-import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
+import { GetInferenceHistory } from "../wailsjs/go/main/App.js";
 import {
-  GenerateCompletion,
-  GetInferenceHistory,
-} from "../wailsjs/go/main/App.js";
+  EventsEmit,
+  EventsOff,
+  EventsOn,
+  LogError,
+  LogInfo,
+} from "../wailsjs/runtime/runtime.js";
 
 export const createChatSlice = (set, get) => ({
   // Chat state
@@ -215,6 +218,7 @@ export const createChatSlice = (set, get) => ({
   },
 
   // Generation management
+  // Generation management
   generateCompletion: async (promptType, message, cliState) => {
     const {
       setGenerating,
@@ -227,68 +231,129 @@ export const createChatSlice = (set, get) => ({
       setAbortController,
     } = get();
 
-    try {
-      setGenerating(true);
-      clearGenerationError();
+    return new Promise((resolve, reject) => {
+      try {
+        setGenerating(true);
+        clearGenerationError();
 
-      const startTime = Date.now();
-      const controller = new AbortController();
-      setAbortController(controller);
+        const startTime = Date.now();
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const controller = new AbortController();
+        setAbortController(controller);
 
-      // Add user message
-      addMessageToChat({
-        sender: "user",
-        content: message,
-      });
-
-      // Add loading message for assistant
-      const loadingMessage = addMessageToChat({
-        sender: "assistant",
-        content: "",
-        isLoading: true,
-      });
-
-      // Update cliState with message text
-      cliState.PromptText = message;
-
-      // Generate completion
-      const result = await GenerateCompletion(cliState, promptType);
-      const processTime = Date.now() - startTime;
-
-      // Update loading message with result
-      updateMessageInChat(loadingMessage.id, {
-        content: result,
-        isLoading: false,
-        processTime,
-      });
-
-      // Clear input and selection
-      setCurrentMessage("");
-      setSelectedChatId(null);
-
-      return result;
-    } catch (error) {
-      LogError(`Error in chat process: ${error}`);
-      setGenerationError(error.message);
-
-      // Update loading message with error
-      const { chatHistory } = get();
-      const loadingMessage = chatHistory.find((msg) => msg.isLoading);
-      if (loadingMessage) {
-        updateMessageInChat(loadingMessage.id, {
-          content: "An error occurred while processing your request.",
-          isLoading: false,
-          sender: "system",
+        // Add user message
+        addMessageToChat({
+          sender: "user",
+          content: message,
         });
+
+        // Add loading message for assistant
+        const loadingMessage = addMessageToChat({
+          sender: "assistant",
+          content: "",
+          isLoading: true,
+        });
+
+        // Prepare the request data
+        const requestData = {
+          requestId: requestId,
+          llamaCliArgs: {
+            ...cliState,
+            PromptText: message,
+          },
+          promptType: promptType,
+        };
+
+        // Set up event listeners for this specific request
+        const handleResponse = (response) => {
+          if (response.requestId === requestId) {
+            const processTime = Date.now() - startTime;
+
+            if (response.success) {
+              // Update loading message with result
+              updateMessageInChat(loadingMessage.id, {
+                content: response.result,
+                isLoading: false,
+                processTime,
+              });
+
+              // Clear input and selection
+              setCurrentMessage("");
+              setSelectedChatId(null);
+
+              resolve(response.result);
+            } else {
+              // Handle error
+              LogError(`Error in chat process: ${response.error}`);
+              setGenerationError(response.error);
+
+              // Update loading message with error
+              updateMessageInChat(loadingMessage.id, {
+                content: "An error occurred while processing your request.",
+                isLoading: false,
+                sender: "system",
+              });
+
+              reject(new Error(response.error));
+            }
+
+            // Cleanup
+            setGenerating(false);
+            setAbortController(null);
+
+            // Remove event listeners
+            EventsOff("inference-completion-response", handleResponse);
+            EventsOff("inference-completion-progress", handleProgress);
+          }
+        };
+
+        const handleProgress = (progress) => {
+          if (progress.requestId === requestId) {
+            // Optional: Update loading message with progress status
+            // You could update the loading message here if you want to show progress
+            LogInfo(
+              `Inference progress: ${progress.status} - ${progress.message} (${progress.progress}%)`,
+            );
+          }
+        };
+
+        // Handle cancellation
+        const handleAbort = () => {
+          // Update loading message with cancellation
+          updateMessageInChat(loadingMessage.id, {
+            content: "Operation cancelled by user.",
+            isLoading: false,
+            sender: "system",
+          });
+
+          setGenerating(false);
+          setAbortController(null);
+
+          // Remove event listeners
+          EventsOff("inference-completion-response", handleResponse);
+          EventsOff("inference-completion-progress", handleProgress);
+
+          reject(new Error("Operation cancelled by user"));
+        };
+
+        // Set up abort signal handling
+        controller.signal.addEventListener("abort", handleAbort);
+
+        // Register event listeners
+        EventsOn("inference-completion-response", handleResponse);
+        EventsOn("inference-completion-progress", handleProgress);
+
+        // Emit the inference completion request event
+        EventsEmit("inference-completion-request", requestData);
+      } catch (error) {
+        LogError(`Error setting up inference request: ${error}`);
+        setGenerationError(error.message);
+        setGenerating(false);
+        setAbortController(null);
+        reject(error);
       }
-
-      throw error;
-    } finally {
-      setGenerating(false);
-      setAbortController(null);
-    }
+    });
   },
-
   cancelGeneration: () => {
     const { abortController, setGenerating, setAbortController } = get();
 

@@ -155,17 +155,7 @@ export const LlamaCliSettingsForm = () => {
         [llamaCliSettings, updateCliField, validateCliSettings, saveState]
     );
 
-    const handleNumericChange = useCallback(
-        (field) => (event) => {
-            const value = event.target.value;
-            // Convert to string immediately to ensure compatibility
-            const stringValue = value === '' ? '' : String(value);
-            handleChange(field, stringValue);
-        },
-        [handleChange]
-    );
-
-    const handlePromptCacheChange = useCallback(
+     const handlePromptCacheChange = useCallback(
         (field, value) => {
             if (!value.length) {
                 updateCliField(field, value);
