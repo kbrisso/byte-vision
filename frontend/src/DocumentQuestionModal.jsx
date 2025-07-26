@@ -15,270 +15,8 @@ import "../public/main.css";
 import PDFDocumentViewer from "./PDFDocumentViewer";
 import { LEGAL_KEYWORDS, DOC_PROMPTS } from "./CommonUtils.jsx";
 import { useInferenceState } from "./StoreConfig.jsx";
-
-// PDF Report Component for Document Analysis
-const PDFReportDocument = ({ reportData }) => (
-  <Document>
-    <Page
-      size="A4"
-      style={{
-        fontFamily: "Helvetica",
-        fontSize: 10,
-        padding: 30,
-        lineHeight: 1.6,
-      }}
-    >
-      {/* Header Section */}
-      <View
-        style={{
-          marginBottom: 20,
-          borderBottom: "1px solid #ccc",
-          paddingBottom: 10,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: "bold",
-            color: "#333",
-            marginBottom: 8,
-          }}
-        >
-          Legal Document Analysis Report
-        </Text>
-        <Text style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-          Document ID: {reportData.documentId}
-        </Text>
-        <Text style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-          Index: {reportData.indexName}
-        </Text>
-        <Text style={{ fontSize: 10, color: "#666" }}>
-          Generated: {new Date().toLocaleString()}
-        </Text>
-      </View>
-
-      {/* Analysis Overview */}
-      <View style={{ marginBottom: 20 }}>
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "bold",
-            color: "#333",
-            marginBottom: 10,
-          }}
-        >
-          Analysis Overview
-        </Text>
-        <View style={{ marginBottom: 8 }}>
-          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#555" }}>
-            Prompt Type: {reportData.promptType}
-          </Text>
-        </View>
-        <View style={{ marginBottom: 8 }}>
-          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#555" }}>
-            Processing Time: {(reportData.processTime / 1000).toFixed(2)}s
-          </Text>
-        </View>
-        <View style={{ marginBottom: 8 }}>
-          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#555" }}>
-            Created: {new Date(reportData.createdAt).toLocaleString()}
-          </Text>
-        </View>
-      </View>
-
-      {/* Document Query */}
-      <View style={{ marginBottom: 20 }}>
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "bold",
-            color: "#333",
-            marginBottom: 10,
-          }}
-        >
-          Document Query
-        </Text>
-        <View
-          style={{
-            backgroundColor: "#f5f5f5",
-            padding: 10,
-            borderRadius: 4,
-            marginBottom: 10,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: "bold",
-              color: "#555",
-              marginBottom: 5,
-            }}
-          >
-            Embed Prompt:
-          </Text>
-          <Text style={{ fontSize: 10, color: "#333", lineHeight: 1.4 }}>
-            {reportData.embedPrompt}
-          </Text>
-        </View>
-        <View
-          style={{ backgroundColor: "#f5f5f5", padding: 10, borderRadius: 4 }}
-        >
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: "bold",
-              color: "#555",
-              marginBottom: 5,
-            }}
-          >
-            Document Prompt:
-          </Text>
-          <Text style={{ fontSize: 10, color: "#333", lineHeight: 1.4 }}>
-            {reportData.docPrompt}
-          </Text>
-        </View>
-      </View>
-
-      {/* Keywords Section */}
-      <View style={{ marginBottom: 20 }}>
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "bold",
-            color: "#333",
-            marginBottom: 10,
-          }}
-        >
-          Key Legal Terms
-        </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-          }}
-        >
-          {reportData.keywords &&
-            reportData.keywords.map((keyword, index) => (
-              <View
-                key={index}
-                style={{
-                  backgroundColor: "#e3f2fd",
-                  padding: 4,
-                  borderRadius: 3,
-                  marginRight: 4,
-                  marginBottom: 4,
-                }}
-              >
-                <Text
-                  style={{ fontSize: 9, color: "#1976d2", fontWeight: "bold" }}
-                >
-                  {keyword}
-                </Text>
-              </View>
-            ))}
-        </View>
-      </View>
-
-      {/* Analysis Response */}
-      <View style={{ marginBottom: 20 }}>
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "bold",
-            color: "#333",
-            marginBottom: 10,
-          }}
-        >
-          Legal Analysis Response
-        </Text>
-        <View
-          style={{ backgroundColor: "#f9f9f9", padding: 12, borderRadius: 4 }}
-        >
-          <Text style={{ fontSize: 10, color: "#333", lineHeight: 1.5 }}>
-            {reportData.response}
-          </Text>
-        </View>
-      </View>
-
-      {/* Footer */}
-      <View
-        style={{
-          marginTop: 30,
-          borderTop: "1px solid #ccc",
-          paddingTop: 10,
-        }}
-      >
-        <Text style={{ fontSize: 8, color: "#666", textAlign: "center" }}>
-          Legal Document Analysis Report | Page 1 | ID: {reportData.id}
-        </Text>
-      </View>
-    </Page>
-  </Document>
-);
-
-// PDF Export Components
-const PDFExportDocument = ({ chatHistory, documentTitle }) => (
-  <Document>
-    <Page
-      size="A4"
-      style={{
-        fontFamily: "Helvetica",
-        fontSize: 11,
-        padding: 30,
-        lineHeight: 1.6,
-      }}
-    >
-      <View style={{ marginBottom: 20 }}>
-        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>
-          Chat Session Export
-        </Text>
-        <Text style={{ fontSize: 12, color: "#666", marginBottom: 5 }}>
-          Document: {documentTitle || "Unknown Document"}
-        </Text>
-        <Text style={{ fontSize: 10, color: "#666" }}>
-          Exported on: {new Date().toLocaleString()}
-        </Text>
-      </View>
-
-      {chatHistory &&
-        chatHistory.map((message, index) => (
-          <View key={message.id || index} style={{ marginBottom: 15 }}>
-            <Text
-              style={{
-                fontSize: 10,
-                fontWeight: "bold",
-                color: message.sender === "user" ? "#0066cc" : "#333",
-                marginBottom: 5,
-              }}
-            >
-              {message.sender === "user" ? "User" : "Assistant"} -{" "}
-              {new Date(message.timestamp).toLocaleString()}
-            </Text>
-            <Text
-              style={{
-                fontSize: 11,
-                marginLeft: 10,
-              }}
-            >
-              {message.content}
-            </Text>
-            {message.processTime && (
-              <Text
-                style={{
-                  fontSize: 9,
-                  color: "#666",
-                  marginLeft: 10,
-                  fontStyle: "italic",
-                }}
-              >
-                Processing time: {(message.processTime / 1000).toFixed(1)}s
-              </Text>
-            )}
-          </View>
-        ))}
-    </Page>
-  </Document>
-);
+import { PDFReportDocument } from "./CommonUtils.jsx";
+import { PDFExportDocument } from "./CommonUtils.jsx";
 
 const DocumentQuestionModal = ({
   show,
@@ -303,20 +41,20 @@ const DocumentQuestionModal = ({
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
 
   // Custom hooks
-    const { selectedPromptType } = useInferenceState();
-    const { chatHistory, chatContainerRef, addMessageToChat, clearChatHistory } =
-        useChatHistory();
-    const {
-        selectedKeywords,
-        clearKeywords,
-        keywordDropdownOpen,
-        setKeywordDropdownOpen,
-        hoveredOption,
-        setHoveredOption,
-        multiSelectRef,
-        handleKeywordToggle,
-        handleRemoveKeyword
-    } = useKeywordSelection();
+  const { selectedPromptType } = useInferenceState();
+  const { chatHistory, chatContainerRef, addMessageToChat, clearChatHistory } =
+    useChatHistory();
+  const {
+    selectedKeywords,
+    clearKeywords,
+    keywordDropdownOpen,
+    setKeywordDropdownOpen,
+    hoveredOption,
+    setHoveredOption,
+    multiSelectRef,
+    handleKeywordToggle,
+    handleRemoveKeyword,
+  } = useKeywordSelection();
 
   const loadDocumentHistory = useCallback(async () => {
     if (!docId) return;
@@ -368,88 +106,88 @@ const DocumentQuestionModal = ({
     }
   }, [show, docId, loadDocumentHistory]);
 
-    const handleSubmit = useCallback(
-        async (e) => {
-            e.preventDefault();
-            if (!question.trim() || loading || isProcessing) return;
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!question.trim() || loading || isProcessing) return;
 
-            // Validation - do this BEFORE adding message to chat
-            if (!selectedDocPrompt) {
-                LogError("Please select a prompt type");
-                return;
-            }
-            if (!embeddingPrompt.trim()) {
-                LogError("Embedding prompt is required");
-                return;
-            }
+      // Validation - do this BEFORE adding message to chat
+      if (!selectedDocPrompt) {
+        LogError("Please select a prompt type");
+        return;
+      }
+      if (!embeddingPrompt.trim()) {
+        LogError("Embedding prompt is required");
+        return;
+      }
 
-            try {
-                // Add user message only after validation passes
-                addMessageToChat("user", question);
+      try {
+        // Add a user message only after validation passes
+        addMessageToChat("user", question);
 
-                // Submit query
-                await submitQuery({
-                    llamaCliArgs: cliState,
-                    llamaEmbedArgs: embState,
-                    indexId: indexValue,
-                    documentId: docId,
-                    embeddingPrompt: embeddingPrompt.trim(),
-                    documentPrompt: question.trim(),
-                    promptType: selectedPromptType,
-                    searchKeywords: selectedKeywords,
-                });
+        // Submit query
+        await submitQuery({
+          llamaCliArgs: cliState,
+          llamaEmbedArgs: embState,
+          indexId: indexValue,
+          documentId: docId,
+          embeddingPrompt: embeddingPrompt.trim(),
+          documentPrompt: question.trim(),
+          promptType: selectedPromptType,
+          searchKeywords: selectedKeywords,
+        });
 
-                // Clear question only on successful submission
-                setQuestion("");
-            } catch (error) {
-                // Handle submission error - you might want to remove the user message
-                // or add an error message to chat here
-                LogError(`Query submission failed: ${error.message}`);
-            }
-        },
-        [
-            question,
-            loading,
-            isProcessing,
-            selectedDocPrompt,
-            embeddingPrompt,
-            addMessageToChat,
-            submitQuery,
-            cliState,
-            embState,
-            indexValue,
-            docId,
-            selectedPromptType,
-            selectedKeywords,
-        ],
-    );
-    const formatDate = (dateValue) => {
-        if (!dateValue) return "Unknown Date";
-        try {
-            const date = new Date(dateValue);
-            return date.toLocaleDateString();
-        } catch (error) {
-            LogError(`Failed to format date: ${error}`);
-            return "Invalid Date";
-        }
-    };
+        // Clear question only on successful submission
+        setQuestion("");
+      } catch (error) {
+        // Handle submission error - you might want to remove the user message
+        // or add an error message to chat here
+        LogError(`Query submission failed: ${error.message}`);
+      }
+    },
+    [
+      question,
+      loading,
+      isProcessing,
+      selectedDocPrompt,
+      embeddingPrompt,
+      addMessageToChat,
+      submitQuery,
+      cliState,
+      embState,
+      indexValue,
+      docId,
+      selectedPromptType,
+      selectedKeywords,
+    ],
+  );
+  const formatDate = (dateValue) => {
+    if (!dateValue) return "Unknown Date";
+    try {
+      const date = new Date(dateValue);
+      return date.toLocaleDateString();
+    } catch (error) {
+      LogError(`Failed to format date: ${error}`);
+      return "Invalid Date";
+    }
+  };
 
-    // Reset state when modal opens/closes
-    useEffect(() => {
-        if (!show) {
-            clearChatHistory();
-            clearKeywords();
-            setQuestion("");
-            setSelectedDocPrompt("");
-            setEmbeddingPrompt("");
-            setDocumentHistory([]);
-            setLoading(false);
-            setLeftActiveTab("history"); // Reset tab
-            setSelectedHistoryId(null);
-            setSelectedHistoryItem(null);
-            setExportingPDF(false);
-        }
-    }, [show, clearChatHistory, clearKeywords]);
+  // Reset state when modal opens/closes
+  useEffect(() => {
+    if (!show) {
+      clearChatHistory();
+      clearKeywords();
+      setQuestion("");
+      setSelectedDocPrompt("");
+      setEmbeddingPrompt("");
+      setDocumentHistory([]);
+      setLoading(false);
+      setLeftActiveTab("history"); // Reset tab
+      setSelectedHistoryId(null);
+      setSelectedHistoryItem(null);
+      setExportingPDF(false);
+    }
+  }, [show, clearChatHistory, clearKeywords]);
 
   const handleKeyDown = useCallback(
     (e) => {
@@ -1064,12 +802,12 @@ const DocumentQuestionModal = ({
               </div>
 
               {/* Tab Content */}
-              <div className="flex-grow-1 d-flex flex-column theme-scrollbar" style={{ overflowY: "auto" }}>
+              <div
+                className="flex-grow-1 d-flex flex-column theme-scrollbar"
+                style={{ overflowY: "auto" }}
+              >
                 {leftActiveTab === "history" ? (
-                  <div className="flex-grow-1 p-2">
-
-                    {renderHistoryList()}
-                  </div>
+                  <div className="flex-grow-1 p-2">{renderHistoryList()}</div>
                 ) : (
                   <div className="d-flex flex-column h-100">
                     {/* Chat Messages - Reduced Height */}
@@ -1139,7 +877,9 @@ const DocumentQuestionModal = ({
                                   />
                                 </div>
                               ) : (
-                                <div style={{whiteSpace: "pre-wrap"}}>{formatMessageText(message.content)}</div>
+                                <div style={{ whiteSpace: "pre-wrap" }}>
+                                  {formatMessageText(message.content)}
+                                </div>
                               )}
                               {message.processTime && (
                                 <small className="d-block mt-1 opacity-75">
@@ -1354,13 +1094,12 @@ const DocumentQuestionModal = ({
         </Modal.Body>
       </Modal>
       {/* Progress Overlay - rendered conditionally when progressMessage exists */}
-        {isProcessing && progressMessage && (
-            <ProgressMessageContainer
-                progressMessage={progressMessage}
-                onCancel={handleCancel}
-            />
-        )}
-
+      {isProcessing && progressMessage && (
+        <ProgressMessageContainer
+          progressMessage={progressMessage}
+          onCancel={handleCancel}
+        />
+      )}
     </>
   );
 };

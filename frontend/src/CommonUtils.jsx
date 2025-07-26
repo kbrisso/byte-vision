@@ -1,5 +1,4 @@
-// common.jsx
-
+import { Document, Page, Text, View } from "@react-pdf/renderer";
 /**
  * Prompt types for different AI models
  */
@@ -227,22 +226,519 @@ export const DOC_PROMPTS = {
     "Analyze the document for issues related to the separation of executive, legislative, and judicial powers.",
 };
 
-/**
- * Helper function to get all prompt type keys
- * @returns {string[]} Array of prompt type names
- */
-export const getDocPromptsKeys = () => Object.keys(DOC_PROMPTS);
+// PDF Report Component for Document Analysis
+export const PDFReportDocument = ({ reportData }) => (
+  <Document>
+    <Page
+      size="A4"
+      style={{
+        fontFamily: "Helvetica",
+        fontSize: 10,
+        padding: 30,
+        lineHeight: 1.6,
+      }}
+    >
+      {/* Header Section */}
+      <View
+        style={{
+          marginBottom: 20,
+          borderBottom: "1px solid #ccc",
+          paddingBottom: 10,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 8,
+          }}
+        >
+          Legal Document Analysis Report
+        </Text>
+        <Text style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+          Document ID: {reportData.documentId}
+        </Text>
+        <Text style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+          Index: {reportData.indexName}
+        </Text>
+        <Text style={{ fontSize: 10, color: "#666" }}>
+          Generated: {new Date().toLocaleString()}
+        </Text>
+      </View>
 
-/**
- * Helper function to get prompt template by type
- * @param {string} type - The prompt type
- * @returns {string} The corresponding prompt template
- */
-export const getDocPrompts = (type) => DOC_PROMPTS[type] || "";
+      {/* Analysis Overview */}
+      <View style={{ marginBottom: 20 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 10,
+          }}
+        >
+          Analysis Overview
+        </Text>
+        <View style={{ marginBottom: 8 }}>
+          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#555" }}>
+            Prompt Type: {reportData.promptType}
+          </Text>
+        </View>
+        <View style={{ marginBottom: 8 }}>
+          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#555" }}>
+            Processing Time: {(reportData.processTime / 1000).toFixed(2)}s
+          </Text>
+        </View>
+        <View style={{ marginBottom: 8 }}>
+          <Text style={{ fontSize: 10, fontWeight: "bold", color: "#555" }}>
+            Created: {new Date(reportData.createdAt).toLocaleString()}
+          </Text>
+        </View>
+      </View>
 
-/**
- * Helper function to check if a prompt type exists
- * @param {string} type - The prompt type to check
- * @returns {boolean} Whether the prompt type exists
- */
-export const isValidDocPrompts = (type) => type in DOC_PROMPTS;
+      {/* Document Query */}
+      <View style={{ marginBottom: 20 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 10,
+          }}
+        >
+          Document Query
+        </Text>
+        <View
+          style={{
+            backgroundColor: "#f5f5f5",
+            padding: 10,
+            borderRadius: 4,
+            marginBottom: 10,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: "bold",
+              color: "#555",
+              marginBottom: 5,
+            }}
+          >
+            Embed Prompt:
+          </Text>
+          <Text style={{ fontSize: 10, color: "#333", lineHeight: 1.4 }}>
+            {reportData.embedPrompt}
+          </Text>
+        </View>
+        <View
+          style={{ backgroundColor: "#f5f5f5", padding: 10, borderRadius: 4 }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: "bold",
+              color: "#555",
+              marginBottom: 5,
+            }}
+          >
+            Document Prompt:
+          </Text>
+          <Text style={{ fontSize: 10, color: "#333", lineHeight: 1.4 }}>
+            {reportData.docPrompt}
+          </Text>
+        </View>
+      </View>
+
+      {/* Keywords Section */}
+      <View style={{ marginBottom: 20 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 10,
+          }}
+        >
+          Key Legal Terms
+        </Text>
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+          }}
+        >
+          {reportData.keywords &&
+            reportData.keywords.map((keyword, index) => (
+              <View
+                key={index}
+                style={{
+                  backgroundColor: "#e3f2fd",
+                  padding: 4,
+                  borderRadius: 3,
+                  marginRight: 4,
+                  marginBottom: 4,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 9, color: "#1976d2", fontWeight: "bold" }}
+                >
+                  {keyword}
+                </Text>
+              </View>
+            ))}
+        </View>
+      </View>
+
+      {/* Analysis Response */}
+      <View style={{ marginBottom: 20 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 10,
+          }}
+        >
+          Legal Analysis Response
+        </Text>
+        <View
+          style={{ backgroundColor: "#f9f9f9", padding: 12, borderRadius: 4 }}
+        >
+          <Text style={{ fontSize: 10, color: "#333", lineHeight: 1.5 }}>
+            {reportData.response}
+          </Text>
+        </View>
+      </View>
+
+      {/* Footer */}
+      <View
+        style={{
+          marginTop: 30,
+          borderTop: "1px solid #ccc",
+          paddingTop: 10,
+        }}
+      >
+        <Text style={{ fontSize: 8, color: "#666", textAlign: "center" }}>
+          Legal Document Analysis Report | Page 1 | ID: {reportData.id}
+        </Text>
+      </View>
+    </Page>
+  </Document>
+);
+
+// PDF Export Components
+export const PDFExportDocument = ({ chatHistory, documentTitle }) => (
+  <Document>
+    <Page
+      size="A4"
+      style={{
+        fontFamily: "Helvetica",
+        fontSize: 11,
+        padding: 30,
+        lineHeight: 1.6,
+      }}
+    >
+      <View style={{ marginBottom: 20 }}>
+        <Text style={{ fontSize: 18, fontWeight: "bold", marginBottom: 10 }}>
+          Chat Session Export
+        </Text>
+        <Text style={{ fontSize: 12, color: "#666", marginBottom: 5 }}>
+          Document: {documentTitle || "Unknown Document"}
+        </Text>
+        <Text style={{ fontSize: 10, color: "#666" }}>
+          Exported on: {new Date().toLocaleString()}
+        </Text>
+      </View>
+
+      {chatHistory &&
+        chatHistory.map((message, index) => (
+          <View key={message.id || index} style={{ marginBottom: 15 }}>
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: "bold",
+                color: message.sender === "user" ? "#0066cc" : "#333",
+                marginBottom: 5,
+              }}
+            >
+              {message.sender === "user" ? "User" : "Assistant"} -{" "}
+              {new Date(message.timestamp).toLocaleString()}
+            </Text>
+            <Text
+              style={{
+                fontSize: 11,
+                marginLeft: 10,
+              }}
+            >
+              {message.content}
+            </Text>
+            {message.processTime && (
+              <Text
+                style={{
+                  fontSize: 9,
+                  color: "#666",
+                  marginLeft: 10,
+                  fontStyle: "italic",
+                }}
+              >
+                Processing time: {(message.processTime / 1000).toFixed(1)}s
+              </Text>
+            )}
+          </View>
+        ))}
+    </Page>
+  </Document>
+);
+
+// Extracted PDF component for better separation of concerns
+export const PDFConversationDocument = ({ chatHistory, documentTitle }) => (
+  <Document>
+    <Page
+      size="A4"
+      style={{
+        fontFamily: "Helvetica",
+        fontSize: 10,
+        padding: 30,
+        lineHeight: 1.6,
+      }}
+    >
+      {/* Header Section */}
+      <View
+        style={{
+          marginBottom: 20,
+          borderBottom: "2px solid #333",
+          paddingBottom: 15,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 20,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 8,
+          }}
+        >
+          Inference Export
+        </Text>
+        <Text style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
+          Document: {documentTitle || "Unknown Document"}
+        </Text>
+        <Text style={{ fontSize: 10, color: "#666" }}>
+          Exported: {new Date().toLocaleString()}
+        </Text>
+      </View>
+
+      {/* Session Summary */}
+      <View
+        style={{
+          marginBottom: 20,
+          backgroundColor: "#f8f9fa",
+          padding: 12,
+          borderRadius: 4,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 8,
+          }}
+        >
+          Session Summary
+        </Text>
+        <View
+          style={{ display: "flex", flexDirection: "row", marginBottom: 4 }}
+        >
+          <Text style={{ fontSize: 10, color: "#555", width: "30%" }}>
+            Total Messages:
+          </Text>
+          <Text style={{ fontSize: 10, color: "#333" }}>
+            {chatHistory.length}
+          </Text>
+        </View>
+        <View
+          style={{ display: "flex", flexDirection: "row", marginBottom: 4 }}
+        >
+          <Text style={{ fontSize: 10, color: "#555", width: "30%" }}>
+            User Messages:
+          </Text>
+          <Text style={{ fontSize: 10, color: "#333" }}>
+            {chatHistory.filter((msg) => msg.sender === "user").length}
+          </Text>
+        </View>
+        <View
+          style={{ display: "flex", flexDirection: "row", marginBottom: 4 }}
+        >
+          <Text style={{ fontSize: 10, color: "#555", width: "30%" }}>
+            Assistant Responses:
+          </Text>
+          <Text style={{ fontSize: 10, color: "#333" }}>
+            {chatHistory.filter((msg) => msg.sender === "assistant").length}
+          </Text>
+        </View>
+        {chatHistory.length > 0 && (
+          <View style={{ display: "flex", flexDirection: "row" }}>
+            <Text style={{ fontSize: 10, color: "#555", width: "30%" }}>
+              Session Started:
+            </Text>
+            <Text style={{ fontSize: 10, color: "#333" }}>
+              {new Date(chatHistory[0].timestamp).toLocaleString()}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Conversation Messages */}
+      <View style={{ marginBottom: 20 }}>
+        <Text
+          style={{
+            fontSize: 14,
+            fontWeight: "bold",
+            color: "#333",
+            marginBottom: 15,
+          }}
+        >
+          Conversation History
+        </Text>
+        {chatHistory.map((message, index) => (
+          <View key={message.id || index} style={{ marginBottom: 20 }}>
+            {/* Message Header */}
+            <View
+              style={{
+                backgroundColor:
+                  message.sender === "user" ? "#e3f2fd" : "#f5f5f5",
+                padding: 8,
+                borderRadius: 4,
+                borderBottom: "1px solid #ddd",
+              }}
+            >
+              <View
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "bold",
+                    color: message.sender === "user" ? "#1976d2" : "#333",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  {message.sender === "user" ? "User" : "Assistant"}
+                </Text>
+                <Text style={{ fontSize: 9, color: "#666" }}>
+                  {new Date(message.timestamp).toLocaleString()}
+                </Text>
+              </View>
+              {message.processTime && (
+                <Text
+                  style={{
+                    fontSize: 8,
+                    color: "#666",
+                    fontStyle: "italic",
+                    marginTop: 2,
+                  }}
+                >
+                  Processing time: {(message.processTime / 1000).toFixed(2)}s
+                </Text>
+              )}
+            </View>
+
+            {/* Message Content */}
+            <View
+              style={{
+                backgroundColor: "#fff",
+                border: "1px solid #ddd",
+                borderTop: "none",
+                padding: 12,
+                borderRadius: 4,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: "#333",
+                  lineHeight: 1.5,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {message.content}
+              </Text>
+            </View>
+
+            {/* Keywords if available */}
+            {message.keywords && message.keywords.length > 0 && (
+              <View
+                style={{
+                  marginTop: 8,
+                  padding: 8,
+                  backgroundColor: "#f8f9fa",
+                  borderRadius: 4,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontWeight: "bold",
+                    color: "#555",
+                    marginBottom: 4,
+                  }}
+                >
+                  Keywords:
+                </Text>
+                <View
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    gap: 4,
+                  }}
+                >
+                  {message.keywords.map((keyword, idx) => (
+                    <View
+                      key={idx}
+                      style={{
+                        backgroundColor: "#e3f2fd",
+                        padding: "2px 6px",
+                        borderRadius: 2,
+                        marginRight: 3,
+                        marginBottom: 2,
+                      }}
+                    >
+                      <Text style={{ fontSize: 8, color: "#1976d2" }}>
+                        {keyword}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+
+      {/* Footer */}
+      <View
+        style={{
+          position: "absolute",
+          bottom: 20,
+          left: 30,
+          right: 30,
+          borderTop: "1px solid #ccc",
+          paddingTop: 10,
+        }}
+      >
+        <Text style={{ fontSize: 8, color: "#666", textAlign: "center" }}>
+          Legal Document Conversation Export | Generated:{" "}
+          {new Date().toLocaleString()}
+        </Text>
+      </View>
+    </Page>
+  </Document>
+);

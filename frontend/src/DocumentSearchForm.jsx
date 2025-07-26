@@ -294,7 +294,7 @@ const DocumentSearchForm = () => {
         cliState,
         embState,
         indexValue: selectedIndexValue,
-        title
+        title,
       });
 
       setModalOpen(true);
@@ -494,7 +494,7 @@ const DocumentSearchForm = () => {
           }}
         >
           <thead
-              className="ttable-bordered"
+            className="ttable-bordered"
             style={{
               position: "sticky",
               top: 0,
@@ -637,7 +637,12 @@ const DocumentSearchForm = () => {
                     size="sm"
                     className="theme-btn-primary"
                     onClick={(e) =>
-                      handleQuestionDocument(item.id, item.sourceLocation, item.title, e)
+                      handleQuestionDocument(
+                        item.id,
+                        item.sourceLocation,
+                        item.title,
+                        e,
+                      )
                     }
                     title="Ask questions about this document"
                   >
