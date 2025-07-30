@@ -9,7 +9,7 @@ import {
     Row,
     Spinner,
 } from "react-bootstrap";
-import { Document, Page, pdf, Text, View } from "@react-pdf/renderer";
+import { pdf } from "@react-pdf/renderer";
 
 import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
 import { CancelProcess } from "../wailsjs/go/main/App.js";

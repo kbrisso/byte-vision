@@ -329,7 +329,6 @@ const createGenerationActions = (set, get) => ({
   },
 });
 
-// Event handlers
 const createResponseHandler = (requestId, startTime, loadingMessage, actions, resolve, reject) => {
   return (response) => {
     LogInfo(`Response received: ${JSON.stringify(response)}`);
@@ -338,44 +337,42 @@ const createResponseHandler = (requestId, startTime, loadingMessage, actions, re
 
     const processTime = Date.now() - startTime;
 
-    // Cleanup event listeners
+    // Cleanup event listeners first
     EventsOff("inference-completion-response");
     EventsOff("inference-completion-progress");
+
+    // Reset generation state for both success and error cases
+    actions.setGenerating(false);
+    actions.setAbortController(null);
 
     if (response.success) {
       // Update with successful result
       actions.updateMessageInChat(loadingMessage.id, {
         content: response.result,
-        isLoading: false,
+        isLoading: false, // Explicitly set to false
         processTime,
       });
 
-      // Reset state
+      // Reset form state
       actions.setCurrentMessage("");
       actions.setSelectedChatId(null);
-      actions.setGenerating(false);
-      actions.setAbortController(null);
 
       resolve(response.result);
     } else {
-      // Handle error
+      // Handle error - CRITICAL FIX: Ensure isLoading is set to false
       LogError(`Error in chat process: ${response.error}`);
       actions.setGenerationError(response.error);
 
       actions.updateMessageInChat(loadingMessage.id, {
         content: "An error occurred while processing your request.",
-        isLoading: false,
+        isLoading: false, // This was missing the explicit false assignment
         sender: "system",
       });
-
-      actions.setGenerating(false);
-      actions.setAbortController(null);
 
       reject(new Error(response.error));
     }
   };
 };
-
 const createProgressHandler = (requestId) => {
   return (progress) => {
     if (progress.requestId === requestId) {
@@ -386,12 +383,14 @@ const createProgressHandler = (requestId) => {
 
 const createAbortHandler = (loadingMessage, actions, reject) => {
   return () => {
+    // Update loading message with cancellation
     actions.updateMessageInChat(loadingMessage.id, {
       content: "Operation cancelled by user.",
-      isLoading: false,
+      isLoading: false, // Explicitly set to false
       sender: "system",
     });
 
+    // Reset generation state
     actions.setGenerating(false);
     actions.setAbortController(null);
 
