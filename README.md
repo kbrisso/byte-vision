@@ -176,7 +176,7 @@ cd frontend && npm install && cd ..
 -p 9200:9200 -p 9300:9300
 -e "discovery.type=single-node"
 -e "xpack.security.enabled=false"
-docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+docker.elastic.co/elastic/elastic:8.11.0
 ```
 
 **Option B: Local Installation**
@@ -187,7 +187,7 @@ docker.elastic.co/elasticsearch/elasticsearch:8.11.0
 # Windows
 bin\elasticsearch.bat       
 # macOS/Linux
-bin/elasticsearch   
+bin/elastic   
 ```
 #### 3. Install LlamaCpp
 
@@ -370,7 +370,7 @@ The application uses environment variables defined in `byte-vision-cfg.env`:
 4. Check firewall settings
 5. For Docker: Ensure container is running
    ```bash
-   docker ps | grep elasticsearch
+   docker ps | grep elastic
    ```
 </details>
 

@@ -218,7 +218,6 @@ export const createChatSlice = (set, get) => ({
   },
 
   // Generation management
-  // Generation management
   generateCompletion: async (promptType, message, cliState) => {
     const {
       setGenerating,
@@ -266,6 +265,7 @@ export const createChatSlice = (set, get) => ({
 
         // Set up event listeners for this specific request
         const handleResponse = (response) => {
+          LogInfo(`Response received: ${JSON.stringify(response)}`);
           if (response.requestId === requestId) {
             const processTime = Date.now() - startTime;
 
@@ -309,11 +309,11 @@ export const createChatSlice = (set, get) => ({
 
         const handleProgress = (progress) => {
           if (progress.requestId === requestId) {
+            LogInfo(`Progress received: ${JSON.stringify(progress)}`);
             // Optional: Update loading message with progress status
             // You could update the loading message here if you want to show progress
             LogInfo(
-              `Inference progress: ${progress.status} - ${progress.message} (${progress.progress}%)`,
-            );
+              `Inference progress: ${JSON.stringify(progress.requestId)} ${JSON.stringify(progress.status)} - ${JSON.stringify(progress.message)} ${JSON.stringify(progress.progress)}`);
           }
         };
 

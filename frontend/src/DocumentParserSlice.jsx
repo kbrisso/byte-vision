@@ -1,5 +1,5 @@
 import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
-import { AddElasticDocument, CancelProcess } from "../wailsjs/go/main/App.js";
+import {  CancelProcess } from "../wailsjs/go/main/App.js";
 import { EventsEmit, EventsOff, EventsOn } from "../wailsjs/runtime/runtime.js";
 
 export const createParserSlice = (set, get) => ({
@@ -88,17 +88,15 @@ export const createParserSlice = (set, get) => ({
         // Prepare the request data
         const requestData = {
           requestId: requestId,
-          settings: settings.llamaEmbed,
-          config: {
-            selectedDocType: config.selectedDocType,
-            indexName: config.indexName,
-            title: config.title,
-            metaTextDesc: config.metaTextDesc,
-            metaKeyWords: config.metaKeyWords,
-            sourceLocation: config.sourceLocation,
-            chunkSize: parseInt(config.chunkSize),
-            chunkOverlap: parseInt(config.chunkOverlap),
-          },
+          embeddingArguments: settings.llamaEmbed,  // Changed from 'settings'
+          embeddingType: config.selectedDocType,    // Moved from config to top level
+          indexName: config.indexName,              // Moved from config to top level
+          title: config.title,                      // Moved from config to top level
+          metaTextDesc: config.metaTextDesc,        // Moved from config to top level
+          metaKeyWords: config.metaKeyWords,        // Moved from config to top level
+          sourceLocation: config.sourceLocation,    // Moved from config to top level
+          chunkSize: parseInt(config.chunkSize),    // Moved from config to top level
+          chunkOverlap: parseInt(config.chunkOverlap), // Moved from config to top level
         };
 
         // Set up event listeners for this specific request
@@ -128,8 +126,8 @@ export const createParserSlice = (set, get) => ({
             setProcessingStage("");
 
             // Remove event listeners
-            EventsOff("document-parser-response", handleResponse);
-            EventsOff("document-parser-progress", handleProgress);
+            EventsOff("add-document-response", handleResponse);
+            EventsOff("add-document-progress", handleProgress);
           }
         };
 
@@ -152,8 +150,8 @@ export const createParserSlice = (set, get) => ({
           setProcessingStage("");
 
           // Remove event listeners
-          EventsOff("document-parser-response", handleResponse);
-          EventsOff("document-parser-progress", handleProgress);
+          EventsOff("add-document-response", handleResponse);
+          EventsOff("add-document-progress", handleProgress);
 
           reject(new Error("Operation cancelled by user"));
         };
@@ -162,11 +160,11 @@ export const createParserSlice = (set, get) => ({
         controller.signal.addEventListener("abort", handleAbort);
 
         // Register event listeners
-        EventsOn("document-parser-response", handleResponse);
-        EventsOn("document-parser-progress", handleProgress);
+        EventsOn("add-document-response", handleResponse);
+        EventsOn("add-document-progress", handleProgress);
 
         // Emit the document parser request event
-        EventsEmit("document-parser-request", requestData);
+        EventsEmit("add-document-request", requestData);
       } catch (error) {
         LogError(`Error setting up document parsing request: ${error}`);
         setParserError(error.message);

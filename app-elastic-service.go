@@ -139,6 +139,69 @@ func (a *App) SetupEventListeners() {
 		}
 	})
 
+	// Listen for document add requests
+	runtime.EventsOn(a.ctx, "add-document-request", func(optionalData ...interface{}) {
+		a.log.Info(fmt.Sprintf("Received add-document-request event with %d parameters", len(optionalData)))
+
+		if len(optionalData) > 0 {
+			// Parse the request data
+			requestData, ok := optionalData[0].(map[string]interface{})
+			if !ok {
+				a.emitDocumentAddResponse(DocumentAddResponse{
+					RequestID: "",
+					Success:   false,
+					Error:     "Invalid request data format",
+				})
+				return
+			}
+
+			// Convert to JSON and then to struct for proper type handling
+			jsonData, err := json.Marshal(requestData)
+			if err != nil {
+				a.log.Info(fmt.Sprintf(
+					"Failed to marshal add request data: %v", err.Error()))
+				a.emitDocumentAddResponse(DocumentAddResponse{
+					RequestID: fmt.Sprintf("%v", requestData["requestId"]),
+					Success:   false,
+					Error:     "Failed to parse request data: " + err.Error(),
+				})
+				return
+			}
+
+			var request DocumentAddRequest
+			if err := json.Unmarshal(jsonData, &request); err != nil {
+				a.log.Info(fmt.Sprintf("Failed to unmarshal add request data: %v", err.Error()))
+				a.emitDocumentAddResponse(DocumentAddResponse{
+					RequestID: fmt.Sprintf("%v", requestData["requestId"]),
+					Success:   false,
+					Error:     "Failed to unmarshal request: " + err.Error(),
+				})
+				return
+			}
+
+			a.log.Info(fmt.Sprintf("Parsed add request successfully: %+v", request))
+
+			// Execute the handleAddDocumentRequest method asynchronously
+			go a.handleAddDocumentRequest(request)
+		} else {
+			a.log.Info("No data received in add-document-request event")
+		}
+	})
+
+	// Listen for add-document-progress events (if you need to handle progress from frontend)
+	runtime.EventsOn(a.ctx, "add-document-progress", func(optionalData ...interface{}) {
+		a.log.Info("Received add-document-progress event")
+		// This is typically used for emitting progress, not listening
+		// But you can add custom logic here if needed
+	})
+
+	// Listen for add-document-response events (if you need to handle responses from frontend)
+	runtime.EventsOn(a.ctx, "add-document-response", func(optionalData ...interface{}) {
+		a.log.Info("Received add-document-response event")
+		// This is typically used for emitting responses, not listening
+		// But you can add custom logic here if needed
+	})
+
 	a.log.Info("Event listeners setup complete")
 }
 
@@ -333,13 +396,18 @@ func (a *App) emitDocumentQueryResponse(response DocumentQueryResponse) {
 }
 
 func (a *App) emitDocumentAddResponse(response DocumentAddResponse) {
-	runtime.EventsEmit(a.wailsCtx, "add-document-response", response)
+	a.log.Info(fmt.Sprintf("Emitting add document response: %+v", response))
+	runtime.EventsEmit(a.ctx, "add-document-response", response)
+}
+func (a *App) emitDocumentAddProgress(progress map[string]interface{}) {
+	a.log.Info(fmt.Sprintf("Emitting add document progress: %+v", progress))
+	runtime.EventsEmit(a.ctx, "add-document-progress", progress)
 }
 
 // handleAddDocumentRequest processes the added document request asynchronously
 func (a *App) handleAddDocumentRequest(request DocumentAddRequest) {
 	// Emit progress event
-	runtime.EventsEmit(a.ctx, "add-document-progress", map[string]interface{}{
+	a.emitDocumentAddProgress(map[string]interface{}{
 		"requestId": request.RequestID,
 		"status":    "processing",
 		"message":   "Adding document to Elasticsearch...",

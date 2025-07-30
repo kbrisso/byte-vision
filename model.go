@@ -4,10 +4,19 @@ import (
 	"context"
 	"os/exec"
 	"runtime"
+	"sync"
 	"syscall"
 )
 
+var (
+	llamaCliMutex sync.Mutex
+)
+
 func GenerateSingleCompletionWithCancel(ctx context.Context, appArgs DefaultAppArgs, args []string) ([]byte, error) {
+	// Lock to prevent concurrent CLI calls
+	llamaCliMutex.Lock()
+	defer llamaCliMutex.Unlock()
+
 	// Create a child context with cancel
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

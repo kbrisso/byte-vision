@@ -9,7 +9,12 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
+)
+
+var (
+	llamaEmbedMutex sync.Mutex
 )
 
 func parseFloatArray(input string) []float32 {
@@ -47,6 +52,9 @@ func parseFloatArray(input string) []float32 {
 // Cancels the operation if the context is done or the timeout is reached.
 // Executes an external embedding command asynchronously, gathering the result or handling cancellation.
 func GenerateEmbedWithCancel(ctx context.Context, llamaEmbedArgs LlamaEmbedArgs, appArgs DefaultAppArgs, text string) ([]float32, error) {
+	// Lock to prevent concurrent embed calls
+	llamaEmbedMutex.Lock()
+	defer llamaEmbedMutex.Unlock()
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

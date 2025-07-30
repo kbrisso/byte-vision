@@ -305,11 +305,11 @@ func (a *App) generateInferenceCompletionWithProgress(request InferenceCompletio
 
 // Helper functions for emitting events
 func (a *App) emitInferenceCompletionProgress(progress InferenceCompletionProgress) {
-	a.log.Info(fmt.Sprintf("Emitting inference progress: %+v\n", progress))
+	a.log.Info(fmt.Sprintf("Emitting inference progress: %+v", progress))
 	runtime.EventsEmit(a.ctx, "inference-completion-progress", progress)
 }
 
 func (a *App) emitInferenceCompletionResponse(response InferenceCompletionResponse) {
-	a.log.Info(fmt.Sprintf("Emitting inference response: %+v\n", response))
+	a.log.Info(fmt.Sprintf("Emitting inference response: %+v", response))
 	runtime.EventsEmit(a.ctx, "inference-completion-response", response)
 }
