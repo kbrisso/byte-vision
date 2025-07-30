@@ -7,83 +7,148 @@ import {
   LogInfo,
 } from "../wailsjs/runtime/runtime.js";
 
-export const createChatSlice = (set, get) => ({
-  // Chat state
+// Constants
+const DEFAULT_CLI_ARGS = {
+  id: "",
+  description: "Default",
+  promptCmd: "--prompt",
+  promptCmdEnabled: true,
+};
+
+// Utility functions
+const generateRequestId = () =>
+    `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+const generateMessageId = () => Date.now();
+
+const extractUserQuestion = (questionText) => {
+  if (!questionText) return "";
+  const parts = questionText.split("User");
+  return parts.length > 1 ? parts[1].trim() : questionText.trim();
+};
+
+const formatChatData = (chat) => ({
+  _id: chat._id || chat.id || `chat_${Date.now()}_${Math.random()}`,
+  response: chat.response || chat.answer || chat.content || "",
+  args: chat.args || DEFAULT_CLI_ARGS,
+  question: chat.question || chat.query || "",
+  createdAt: chat.createdAt || chat.timestamp || new Date().toISOString(),
+});
+
+const parseHistoryResponse = (result) => {
+  if (Array.isArray(result)) return result;
+  if (result?.history) return result.history;
+  if (result?.data) return result.data;
+
+  // Check for arrays in object properties
+  if (result && typeof result === "object") {
+    const possibleArrayKeys = ["id", "response", "question", "createdAt"];
+    for (const key of possibleArrayKeys) {
+      if (result[key] && Array.isArray(result[key])) {
+        return result[key];
+      }
+    }
+  }
+
+  return [];
+};
+
+// State management
+const createInitialState = () => ({
+  // UI State
   selectedPromptType: "",
   currentMessage: "",
-  chatHistory: [],
-  savedChats: [],
-  selectedChatId: null,
-  hoveredHistoryId: null,
-  isGenerating: false,
-  isLoadingHistory: false,
   textareaFocused: false,
+  hoveredHistoryId: null,
+  selectedChatId: null,
+
+  // Generation State
+  isGenerating: false,
   generationError: null,
-  isInitialized: false,
-  streamingEnabled: false,
   abortController: null,
 
-  // Chat actions
+  // Data State
+  chatHistory: [],
+  savedChats: [],
+
+  // Loading State
+  isLoadingHistory: false,
+  isInitialized: false,
+
+  // Features
+  streamingEnabled: false,
+});
+
+// Action creators
+const createStateActions = (set, get) => ({
+  // Simple state setters
   setSelectedPromptType: (selectedPromptType) =>
-    set((state) => {
-      state.selectedPromptType = selectedPromptType;
-    }),
+      set((state) => {
+        state.selectedPromptType = selectedPromptType;
+      }),
 
   setCurrentMessage: (message) =>
-    set((state) => {
-      state.currentMessage = message;
-    }),
+      set((state) => {
+        state.currentMessage = message;
+      }),
 
   setTextareaFocused: (focused) =>
-    set((state) => {
-      state.textareaFocused = focused;
-    }),
+      set((state) => {
+        state.textareaFocused = focused;
+      }),
 
   setHoveredHistoryId: (id) =>
-    set((state) => {
-      state.hoveredHistoryId = id;
-    }),
+      set((state) => {
+        state.hoveredHistoryId = id;
+      }),
 
   setSelectedChatId: (id) =>
-    set((state) => {
-      state.selectedChatId = id;
-    }),
+      set((state) => {
+        state.selectedChatId = id;
+      }),
 
   setGenerating: (isGenerating) =>
-    set((state) => {
-      state.isGenerating = isGenerating;
-    }),
+      set((state) => {
+        state.isGenerating = isGenerating;
+      }),
 
   setLoadingHistory: (isLoading) =>
-    set((state) => {
-      state.isLoadingHistory = isLoading;
-    }),
+      set((state) => {
+        state.isLoadingHistory = isLoading;
+      }),
 
   setInitialized: (initialized) =>
-    set((state) => {
-      state.isInitialized = initialized;
-    }),
+      set((state) => {
+        state.isInitialized = initialized;
+      }),
 
   setGenerationError: (error) =>
-    set((state) => {
-      state.generationError = error;
-      state.isGenerating = false;
-    }),
+      set((state) => {
+        state.generationError = error;
+        state.isGenerating = false;
+      }),
 
   clearGenerationError: () =>
-    set((state) => {
-      state.generationError = null;
-    }),
+      set((state) => {
+        state.generationError = null;
+      }),
 
   setAbortController: (controller) =>
-    set((state) => {
-      state.abortController = controller;
-    }),
+      set((state) => {
+        state.abortController = controller;
+      }),
 
-  // Message management
+  setSavedChats: (chats) =>
+      set((state) => {
+        state.savedChats = chats;
+      }),
+});
+
+// Message management
+const createMessageActions = (set, get) => ({
   addMessageToChat: (message) => {
     const newMessage = {
-      id: Date.now(),
+      id: generateMessageId(),
       timestamp: new Date().toISOString(),
       ...message,
     };
@@ -96,52 +161,39 @@ export const createChatSlice = (set, get) => ({
   },
 
   updateMessageInChat: (messageId, updates) =>
-    set((state) => {
-      const messageIndex = state.chatHistory.findIndex(
-        (msg) => msg.id === messageId,
-      );
-      if (messageIndex !== -1) {
-        state.chatHistory[messageIndex] = {
-          ...state.chatHistory[messageIndex],
-          ...updates,
-        };
-      }
-    }),
+      set((state) => {
+        const messageIndex = state.chatHistory.findIndex(
+            (msg) => msg.id === messageId,
+        );
+        if (messageIndex !== -1) {
+          state.chatHistory[messageIndex] = {
+            ...state.chatHistory[messageIndex],
+            ...updates,
+          };
+        }
+      }),
 
   removeMessageFromChat: (messageId) =>
-    set((state) => {
-      state.chatHistory = state.chatHistory.filter(
-        (msg) => msg.id !== messageId,
-      );
-    }),
+      set((state) => {
+        state.chatHistory = state.chatHistory.filter(
+            (msg) => msg.id !== messageId,
+        );
+      }),
 
   clearChatHistory: () =>
-    set((state) => {
-      state.chatHistory = [];
-      state.selectedChatId = null;
-    }),
+      set((state) => {
+        state.chatHistory = [];
+        state.selectedChatId = null;
+      }),
+});
 
-  // Saved chats management
-  setSavedChats: (chats) =>
-    set((state) => {
-      state.savedChats = chats;
-    }),
-
+// Chat management
+const createChatActions = (set, get) => ({
   loadSavedChat: (chat) => {
     const { clearChatHistory, addMessageToChat, setSelectedChatId } = get();
 
     clearChatHistory();
     setSelectedChatId(chat._id);
-
-    // Extract user question
-    const extractUserQuestion = (questionText) => {
-      if (!questionText) return "";
-      const parts = questionText.split("User");
-      if (parts.length > 1) {
-        return parts[1].trim();
-      }
-      return questionText.trim();
-    };
 
     const userQuestion = extractUserQuestion(chat.question);
 
@@ -173,39 +225,8 @@ export const createChatSlice = (set, get) => ({
       clearChatHistory();
 
       const result = await GetInferenceHistory();
-
-      let chatHistoryData = [];
-
-      // Handle different response formats
-      if (Array.isArray(result)) {
-        chatHistoryData = result;
-      } else if (result && result.history) {
-        chatHistoryData = result.history;
-      } else if (result && result.data) {
-        chatHistoryData = result.data;
-      } else if (result && typeof result === "object") {
-        const possibleArrayKeys = ["id", "response", "question", "createdAt"];
-        for (const key of possibleArrayKeys) {
-          if (result[key] && Array.isArray(result[key])) {
-            chatHistoryData = result[key];
-            break;
-          }
-        }
-      }
-
-      // Format chats consistently
-      const formattedChats = chatHistoryData.map((chat) => ({
-        _id: chat._id || chat.id || `chat_${Date.now()}_${Math.random()}`,
-        response: chat.response || chat.answer || chat.content || "",
-        args: chat.args || {
-          id: "",
-          description: "Default",
-          promptCmd: "--prompt",
-          promptCmdEnabled: true,
-        },
-        question: chat.question || chat.query || "",
-        createdAt: chat.createdAt || chat.timestamp || new Date().toISOString(),
-      }));
+      const chatHistoryData = parseHistoryResponse(result);
+      const formattedChats = chatHistoryData.map(formatChatData);
 
       setSavedChats(formattedChats);
       LogInfo(`Loaded chat history: ${formattedChats.length}`);
@@ -217,143 +238,85 @@ export const createChatSlice = (set, get) => ({
     }
   },
 
-  // Generation management
+  initializeChat: async () => {
+    const { isInitialized, loadSavedChats, setInitialized } = get();
+
+    if (!isInitialized) {
+      await loadSavedChats();
+      setInitialized(true);
+    }
+  },
+});
+
+// Generation management
+const createGenerationActions = (set, get) => ({
   generateCompletion: async (promptType, message, cliState) => {
-    const {
-      setGenerating,
-      setGenerationError,
-      clearGenerationError,
-      addMessageToChat,
-      updateMessageInChat,
-      setCurrentMessage,
-      setSelectedChatId,
-      setAbortController,
-    } = get();
+    const actions = get();
 
     return new Promise((resolve, reject) => {
       try {
-        setGenerating(true);
-        clearGenerationError();
-
+        const requestId = generateRequestId();
         const startTime = Date.now();
-        const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const controller = new AbortController();
-        setAbortController(controller);
 
-        // Add user message
-        addMessageToChat({
+        // Initialize generation state
+        actions.setGenerating(true);
+        actions.clearGenerationError();
+        actions.setAbortController(controller);
+
+        // Add messages to chat
+        actions.addMessageToChat({
           sender: "user",
           content: message,
         });
 
-        // Add loading message for assistant
-        const loadingMessage = addMessageToChat({
+        const loadingMessage = actions.addMessageToChat({
           sender: "assistant",
           content: "",
           isLoading: true,
         });
 
-        // Prepare the request data
+        // Prepare request data
         const requestData = {
-          requestId: requestId,
+          requestId,
           llamaCliArgs: {
             ...cliState,
             PromptText: message,
           },
-          promptType: promptType,
+          promptType,
         };
 
-        // Set up event listeners for this specific request
-        const handleResponse = (response) => {
-          LogInfo(`Response received: ${JSON.stringify(response)}`);
-          if (response.requestId === requestId) {
-            const processTime = Date.now() - startTime;
+        // Create event handlers
+        const handleResponse = createResponseHandler(
+            requestId,
+            startTime,
+            loadingMessage,
+            actions,
+            resolve,
+            reject
+        );
 
-            if (response.success) {
-              // Update loading message with result
-              updateMessageInChat(loadingMessage.id, {
-                content: response.result,
-                isLoading: false,
-                processTime,
-              });
+        const handleProgress = createProgressHandler(requestId);
+        const handleAbort = createAbortHandler(loadingMessage, actions, reject);
 
-              // Clear input and selection
-              setCurrentMessage("");
-              setSelectedChatId(null);
-
-              resolve(response.result);
-            } else {
-              // Handle error
-              LogError(`Error in chat process: ${response.error}`);
-              setGenerationError(response.error);
-
-              // Update loading message with error
-              updateMessageInChat(loadingMessage.id, {
-                content: "An error occurred while processing your request.",
-                isLoading: false,
-                sender: "system",
-              });
-
-              reject(new Error(response.error));
-            }
-
-            // Cleanup
-            setGenerating(false);
-            setAbortController(null);
-
-            // Remove event listeners
-            EventsOff("inference-completion-response", handleResponse);
-            EventsOff("inference-completion-progress", handleProgress);
-          }
-        };
-
-        const handleProgress = (progress) => {
-          if (progress.requestId === requestId) {
-            LogInfo(`Progress received: ${JSON.stringify(progress)}`);
-            // Optional: Update loading message with progress status
-            // You could update the loading message here if you want to show progress
-            LogInfo(
-              `Inference progress: ${JSON.stringify(progress.requestId)} ${JSON.stringify(progress.status)} - ${JSON.stringify(progress.message)} ${JSON.stringify(progress.progress)}`);
-          }
-        };
-
-        // Handle cancellation
-        const handleAbort = () => {
-          // Update loading message with cancellation
-          updateMessageInChat(loadingMessage.id, {
-            content: "Operation cancelled by user.",
-            isLoading: false,
-            sender: "system",
-          });
-
-          setGenerating(false);
-          setAbortController(null);
-
-          // Remove event listeners
-          EventsOff("inference-completion-response", handleResponse);
-          EventsOff("inference-completion-progress", handleProgress);
-
-          reject(new Error("Operation cancelled by user"));
-        };
-
-        // Set up abort signal handling
+        // Set up event listeners and abort handling
         controller.signal.addEventListener("abort", handleAbort);
-
-        // Register event listeners
         EventsOn("inference-completion-response", handleResponse);
         EventsOn("inference-completion-progress", handleProgress);
 
-        // Emit the inference completion request event
+        // Emit the request
         EventsEmit("inference-completion-request", requestData);
+
       } catch (error) {
         LogError(`Error setting up inference request: ${error}`);
-        setGenerationError(error.message);
-        setGenerating(false);
-        setAbortController(null);
+        actions.setGenerationError(error.message);
+        actions.setGenerating(false);
+        actions.setAbortController(null);
         reject(error);
       }
     });
   },
+
   cancelGeneration: () => {
     const { abortController, setGenerating, setAbortController } = get();
 
@@ -364,14 +327,90 @@ export const createChatSlice = (set, get) => ({
       LogInfo("Generation cancelled by user");
     }
   },
+});
 
-  // Initialization
-  initializeChat: async () => {
-    const { isInitialized, loadSavedChats, setInitialized } = get();
+// Event handlers
+const createResponseHandler = (requestId, startTime, loadingMessage, actions, resolve, reject) => {
+  return (response) => {
+    LogInfo(`Response received: ${JSON.stringify(response)}`);
 
-    if (!isInitialized) {
-      await loadSavedChats();
-      setInitialized(true);
+    if (response.requestId !== requestId) return;
+
+    const processTime = Date.now() - startTime;
+
+    // Cleanup event listeners
+    EventsOff("inference-completion-response");
+    EventsOff("inference-completion-progress");
+
+    if (response.success) {
+      // Update with successful result
+      actions.updateMessageInChat(loadingMessage.id, {
+        content: response.result,
+        isLoading: false,
+        processTime,
+      });
+
+      // Reset state
+      actions.setCurrentMessage("");
+      actions.setSelectedChatId(null);
+      actions.setGenerating(false);
+      actions.setAbortController(null);
+
+      resolve(response.result);
+    } else {
+      // Handle error
+      LogError(`Error in chat process: ${response.error}`);
+      actions.setGenerationError(response.error);
+
+      actions.updateMessageInChat(loadingMessage.id, {
+        content: "An error occurred while processing your request.",
+        isLoading: false,
+        sender: "system",
+      });
+
+      actions.setGenerating(false);
+      actions.setAbortController(null);
+
+      reject(new Error(response.error));
     }
-  },
+  };
+};
+
+const createProgressHandler = (requestId) => {
+  return (progress) => {
+    if (progress.requestId === requestId) {
+      LogInfo(`Progress: ${progress.status} - ${progress.message} (${progress.progress}%)`);
+    }
+  };
+};
+
+const createAbortHandler = (loadingMessage, actions, reject) => {
+  return () => {
+    actions.updateMessageInChat(loadingMessage.id, {
+      content: "Operation cancelled by user.",
+      isLoading: false,
+      sender: "system",
+    });
+
+    actions.setGenerating(false);
+    actions.setAbortController(null);
+
+    // Cleanup event listeners
+    EventsOff("inference-completion-response");
+    EventsOff("inference-completion-progress");
+
+    reject(new Error("Operation cancelled by user"));
+  };
+};
+
+// Main slice creator
+export const createChatSlice = (set, get) => ({
+  // Initial state
+  ...createInitialState(),
+
+  // Actions
+  ...createStateActions(set, get),
+  ...createMessageActions(set, get),
+  ...createChatActions(set, get),
+  ...createGenerationActions(set, get),
 });

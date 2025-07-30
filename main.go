@@ -174,7 +174,7 @@ func main() {
 	app := NewApp(container.Logger, container.LlamaCliArgs, container.LlamaEmbedArgs, container.AppArgs, container.Database)
 
 	// Setup menu
-	appMenu := createAppMenu(app, container)
+	appMenu := createAppMenu(app)
 
 	// Create and configure app options
 	appOptions := createAppOptions(app, appMenu, container)
