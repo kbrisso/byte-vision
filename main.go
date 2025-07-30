@@ -73,7 +73,7 @@ func NewContainer() (*Container, error) {
 	}, nil
 }
 
-func createAppMenu(app *App, container *Container) *menu.Menu {
+func createAppMenu(app *App) *menu.Menu {
 	appMenu := menu.NewMenu()
 
 	// Platform-specific menu handling for macOS
@@ -154,15 +154,6 @@ func createAppOptions(app *App, appMenu *menu.Menu, container *Container) *optio
 			OpenInspectorOnStartup: true,
 		},
 	}
-}
-
-func PrintAppPath(container *Container) {
-	exePath, err := os.Executable()
-	if err != nil {
-		container.Logger.Error("Failed to get executable path:" + err.Error())
-		return
-	}
-	fmt.Printf("Application path: %s\n", exePath)
 }
 
 func main() {

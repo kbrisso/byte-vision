@@ -102,7 +102,6 @@ export const createParserSlice = (set, get) => ({
         // Set up event listeners for this specific request
         const handleResponse = (response) => {
           if (response.requestId === requestId) {
-            const processTime = Date.now() - startTime;
 
             if (response.success) {
               setProcessingProgress(100);
