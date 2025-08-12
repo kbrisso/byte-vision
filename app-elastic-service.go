@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/labstack/gommon/log"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"strings"
-	"time"
 )
 
 // DocumentAddRequest represents the structure for add document requests
@@ -88,151 +88,120 @@ func (a *App) createElasticsearchClient(maxBodyLength int) (*ElasticsearchClient
 	return elasticClient, nil
 }
 
-// SetupEventListeners sets up event listeners for document operations
-func (a *App) SetupEventListeners() {
-	a.log.Info("Setting up event listeners...")
-
-	// Listen for document query requests
-	runtime.EventsOn(a.ctx, "query-document-request", func(optionalData ...interface{}) {
-		a.log.Info("Received query-document-request event with %d parameters\n" + string(rune(len(optionalData))))
-
-		if len(optionalData) > 0 {
-			// Parse the request data
-			requestData, ok := optionalData[0].(map[string]interface{})
-			if !ok {
-				a.emitDocumentQueryResponse(DocumentQueryResponse{
-					RequestID: "",
-					Success:   false,
-					Error:     "Invalid request data format",
-				})
-				return
-			}
-			// Convert to JSON and then to struct for proper type handling
-			jsonData, err := json.Marshal(requestData)
-			if err != nil {
-				a.log.Info("Failed to marshal request data: %v\n" + err.Error())
-				a.emitDocumentQueryResponse(DocumentQueryResponse{
-					RequestID: fmt.Sprintf("%v", requestData["requestId"]),
-					Success:   false,
-					Error:     "Failed to parse request data: " + err.Error(),
-				})
-				return
-			}
-
-			var request DocumentQueryRequest
-			if err := json.Unmarshal(jsonData, &request); err != nil {
-				a.log.Info("Failed to unmarshal request data: %v\n" + err.Error())
-				a.emitDocumentQueryResponse(DocumentQueryResponse{
-					RequestID: fmt.Sprintf("%v", requestData["requestId"]),
-					Success:   false,
-					Error:     "Failed to unmarshal request: " + err.Error(),
-				})
-				return
-			}
-
-			a.log.Info(fmt.Sprintf("Parsed request successfully: %+v\n", request))
-
-			// Execute the QueryElasticDocument method asynchronously
-			go a.handleQueryDocumentRequest(request)
-		} else {
-			a.log.Info("No data received in query-document-request event")
+func extractEmbeddingVector(result interface{}) ([]float64, error) {
+	// Try nested [][]float64 array first
+	if nestedVector, ok := result.([][]float64); ok {
+		if len(nestedVector) == 0 {
+			return nil, fmt.Errorf("embedding result is empty nested array")
 		}
-	})
+		return nestedVector[0], nil
+	}
 
-	// Listen for document add requests
-	runtime.EventsOn(a.ctx, "add-document-request", func(optionalData ...interface{}) {
-		a.log.Info(fmt.Sprintf("Received add-document-request event with %d parameters", len(optionalData)))
-
-		if len(optionalData) > 0 {
-			// Parse the request data
-			requestData, ok := optionalData[0].(map[string]interface{})
-			if !ok {
-				a.emitDocumentAddResponse(DocumentAddResponse{
-					RequestID: "",
-					Success:   false,
-					Error:     "Invalid request data format",
-				})
-				return
-			}
-
-			// Convert to JSON and then to struct for proper type handling
-			jsonData, err := json.Marshal(requestData)
-			if err != nil {
-				a.log.Info(fmt.Sprintf(
-					"Failed to marshal add request data: %v", err.Error()))
-				a.emitDocumentAddResponse(DocumentAddResponse{
-					RequestID: fmt.Sprintf("%v", requestData["requestId"]),
-					Success:   false,
-					Error:     "Failed to parse request data: " + err.Error(),
-				})
-				return
-			}
-
-			var request DocumentAddRequest
-			if err := json.Unmarshal(jsonData, &request); err != nil {
-				a.log.Info(fmt.Sprintf("Failed to unmarshal add request data: %v", err.Error()))
-				a.emitDocumentAddResponse(DocumentAddResponse{
-					RequestID: fmt.Sprintf("%v", requestData["requestId"]),
-					Success:   false,
-					Error:     "Failed to unmarshal request: " + err.Error(),
-				})
-				return
-			}
-
-			a.log.Info(fmt.Sprintf("Parsed add request successfully: %+v", request))
-
-			// Execute the handleAddDocumentRequest method asynchronously
-			go a.handleAddDocumentRequest(request)
-		} else {
-			a.log.Info("No data received in add-document-request event")
+	// Try nested [][]float32 array
+	if nestedVector, ok := result.([][]float32); ok {
+		if len(nestedVector) == 0 {
+			return nil, fmt.Errorf("embedding result is empty nested array")
 		}
-	})
+		// Convert []float32 to []float64
+		f64Vector := make([]float64, len(nestedVector[0]))
+		for i, v := range nestedVector[0] {
+			f64Vector[i] = float64(v)
+		}
+		return f64Vector, nil
+	}
 
-	// Listen for add-document-progress events (if you need to handle progress from frontend)
-	runtime.EventsOn(a.ctx, "add-document-progress", func(optionalData ...interface{}) {
-		a.log.Info("Received add-document-progress event")
-		// This is typically used for emitting progress, not listening
-		// But you can add custom logic here if needed
-	})
+	// Try simple []float64 array
+	if vector, ok := result.([]float64); ok {
+		return vector, nil
+	}
 
-	// Listen for add-document-response events (if you need to handle responses from frontend)
-	runtime.EventsOn(a.ctx, "add-document-response", func(optionalData ...interface{}) {
-		a.log.Info("Received add-document-response event")
-		// This is typically used for emitting responses, not listening
-		// But you can add custom logic here if needed
-	})
+	// Try simple []float32 array
+	if vector, ok := result.([]float32); ok {
+		// Convert []float32 to []float64
+		f64Vector := make([]float64, len(vector))
+		for i, v := range vector {
+			f64Vector[i] = float64(v)
+		}
+		return f64Vector, nil
+	}
 
-	a.log.Info("Event listeners setup complete")
+	return nil, fmt.Errorf("embedding result is not [][]float64, [][]float32, []float64, or []float32, got %T", result)
 }
 
-// handleQueryDocumentRequest processes the document query request asynchronously
+// Helper function to convert []float64 to []float32
+func convertFloat64ToFloat32(f64Slice []float64) []float32 {
+	f32Slice := make([]float32, len(f64Slice))
+	for i, v := range f64Slice {
+		f32Slice[i] = float32(v)
+	}
+	return f32Slice
+}
+
+// Request handlers
 func (a *App) handleQueryDocumentRequest(request DocumentQueryRequest) {
+	// Add input validation
+	if request.IndexID == "" {
+		runtime.EventsEmit(a.ctx, "query-document-response", DocumentQueryResponse{
+			RequestID: request.RequestID,
+			Success:   false,
+			Error:     "Index ID is required",
+		})
+		return
+	}
+
+	if request.DocumentID == "" {
+		runtime.EventsEmit(a.ctx, "query-document-response", DocumentQueryResponse{
+			RequestID: request.RequestID,
+			Success:   false,
+			Error:     "Document ID is required",
+		})
+		return
+	}
+
 	processingStartTime := time.Now()
 
-	// Emit initial progress
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
+	runtime.EventsEmit(a.ctx, "query-document-response", DocumentQueryProgress{
 		RequestID: request.RequestID,
 		Status:    "starting",
 		Message:   "Initializing document query...",
 		Progress:  0,
 	})
 
-	// Reset operation context for this operation
 	a.resetContext()
+
+	// Add nil check for context
+	if a.operationCtx == nil {
+		runtime.EventsEmit(a.ctx, "query-document-response", DocumentQueryResponse{
+			RequestID: request.RequestID,
+			Success:   false,
+			Error:     "Operation context is nil",
+		})
+		return
+	}
 
 	select {
 	case <-a.operationCtx.Done():
 		a.log.Info("Operation was cancelled before starting")
-		a.emitDocumentQueryResponse(DocumentQueryResponse{
+		runtime.EventsEmit(a.ctx, "query-document-response", DocumentQueryResponse{
 			RequestID: request.RequestID,
 			Success:   false,
 			Error:     "Operation cancelled by user",
 		})
 		return
 	default:
-		result := a.queryElasticDocumentWithProgress(request, processingStartTime)
+		// Wrap the main logic in a recover to catch panics
+		defer func() {
+			if r := recover(); r != nil {
+				a.log.Error(fmt.Sprintf("Panic in queryElasticDocumentWithProgress: %v", r))
+				runtime.EventsEmit(a.ctx, "query-document-response", DocumentQueryResponse{
+					RequestID: request.RequestID,
+					Success:   false,
+					Error:     fmt.Sprintf("Internal error: %v", r),
+				})
+			}
+		}()
 
-		// Determine success based on a result
+		result := a.queryElasticDocumentWithProgress(request, processingStartTime)
 		success := !strings.Contains(result, "Error:") && !strings.Contains(result, "cancelled")
 
 		response := DocumentQueryResponse{
@@ -246,174 +215,16 @@ func (a *App) handleQueryDocumentRequest(request DocumentQueryRequest) {
 			response.Error = result
 		}
 
-		// Emit the final response
-		a.emitDocumentQueryResponse(response)
+		runtime.EventsEmit(a.ctx, "query-document-response", response)
 	}
 }
-
-// queryElasticDocumentWithProgress is the refactored version with progress updates
-func (a *App) queryElasticDocumentWithProgress(request DocumentQueryRequest, processingStartTime time.Time) string {
-	// Progress: Creating an Elasticsearch client
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
-		RequestID: request.RequestID,
-		Status:    "connecting",
-		Message:   "Connecting to Elasticsearch...",
-		Progress:  10,
-	})
-
-	elasticClient, err := a.createElasticsearchClient(150000)
-	if err != nil {
-		return "Error: " + err.Error()
-	}
-
-	// Progress: Generating embeddings
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
-		RequestID: request.RequestID,
-		Status:    "embedding",
-		Message:   "Generating vector embeddings...",
-		Progress:  20,
-	})
-
-	// Generate vector embeddings for both keywords and prompt
-	keywordSearchVector, err := GenerateEmbedWithCancel(a.operationCtx, request.LlamaEmbedArgs, *a.appArgs, strings.Join(request.SearchKeywords, " "))
-	if err != nil {
-		if errors.Is(a.operationCtx.Err(), context.Canceled) {
-			a.log.Info("Document analysis was cancelled by user")
-			return "Operation cancelled by user"
-		}
-		a.log.Error("Failed to generate keywordSearchVector embedding: " + err.Error())
-		return "Error: " + err.Error()
-	}
-
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
-		RequestID: request.RequestID,
-		Status:    "embedding",
-		Message:   "Generating prompt embeddings...",
-		Progress:  40,
-	})
-
-	promptSearchVector, err := GenerateEmbedWithCancel(a.ctx, request.LlamaEmbedArgs, *a.appArgs, request.EmbeddingPrompt)
-	if err != nil {
-		if errors.Is(a.operationCtx.Err(), context.Canceled) {
-			a.log.Info("Document analysis was cancelled by user")
-			return "Search cancelled by user"
-		}
-		a.log.Error("Failed to generate embeddingPrompt embedding: " + err.Error())
-		return "Error: " + err.Error()
-	}
-
-	// Progress: Performing searches
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
-		RequestID: request.RequestID,
-		Status:    "searching",
-		Message:   "Performing vector similarity searches...",
-		Progress:  60,
-	})
-
-	keywordSearchResults, err := elasticClient.SearchDocumentByIDWithVector(a.ctx, request.IndexID, request.DocumentID, keywordSearchVector, 15)
-	if err != nil {
-		if errors.Is(a.operationCtx.Err(), context.Canceled) {
-			a.log.Info("Document analysis was cancelled by user")
-			return "Search cancelled by user"
-		}
-		a.log.Error("Failed to search with keywordSearchVector embedding: " + err.Error())
-		return "Error: " + err.Error()
-	}
-
-	promptSearchResults, err := elasticClient.SearchDocumentByIDWithVector(a.ctx, request.IndexID, request.DocumentID, promptSearchVector, 15)
-	if err != nil {
-		if errors.Is(a.operationCtx.Err(), context.Canceled) {
-			a.log.Info("Document analysis was cancelled by user")
-			return "Search cancelled by user"
-		}
-		a.log.Error("Failed to search with promptSearchVector embedding: " + err.Error())
-		return "Error: " + err.Error()
-	}
-
-	// Progress: Processing results
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
-		RequestID: request.RequestID,
-		Status:    "processing",
-		Message:   "Processing search results...",
-		Progress:  80,
-	})
-
-	// Remove duplicates and combine results
-	deduplicatedKeywordResults, deduplicatedPromptResults := removeDuplicateSearchResults(keywordSearchResults, promptSearchResults)
-	combinedSearchContext := deduplicatedKeywordResults + deduplicatedPromptResults
-
-	// Progress: Generating completion
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
-		RequestID: request.RequestID,
-		Status:    "generating",
-		Message:   "Generating AI completion...",
-		Progress:  90,
-	})
-
-	completionResult := a.generateCompletionWithContext(request.LlamaCliArgs, combinedSearchContext, request.DocumentPrompt, request.PromptType)
-
-	// Save the document question response
-	totalProcessingTime := time.Since(processingStartTime).Milliseconds()
-	documentQuestionResponse := DocumentQuestionResponse{
-		ID:          bson.NewObjectID(),
-		DocumentID:  request.DocumentID,
-		IndexName:   request.IndexID,
-		EmbedPrompt: request.EmbeddingPrompt,
-		DocPrompt:   request.DocumentPrompt,
-		Response:    completionResult,
-		Keywords:    request.SearchKeywords,
-		PromptType:  request.PromptType,
-		EmbedArgs:   request.LlamaEmbedArgs,
-		CliState:    request.LlamaCliArgs,
-		CreatedAt:   time.Now(),
-		ProcessTime: totalProcessingTime,
-	}
-
-	if _, err = SaveDocumentQuestionResponse(a.appArgs, documentQuestionResponse); err != nil {
-		a.log.Error("Failed to save document question response: " + err.Error())
-	}
-
-	// Progress: Complete
-	a.emitDocumentQueryProgress(DocumentQueryProgress{
-		RequestID: request.RequestID,
-		Status:    "complete",
-		Message:   "Document query completed successfully",
-		Progress:  100,
-	})
-
-	return completionResult
-}
-
-// Helper functions for emitting events
-func (a *App) emitDocumentQueryProgress(progress DocumentQueryProgress) {
-	a.log.Info(fmt.Sprintf("Emitting progress: %+v\n", progress))
-	runtime.EventsEmit(a.ctx, "query-document-progress", progress)
-}
-
-func (a *App) emitDocumentQueryResponse(response DocumentQueryResponse) {
-	a.log.Info(fmt.Sprintf("Emitting response: %+v\n", response))
-	runtime.EventsEmit(a.ctx, "query-document-response", response)
-}
-
-func (a *App) emitDocumentAddResponse(response DocumentAddResponse) {
-	a.log.Info(fmt.Sprintf("Emitting add document response: %+v", response))
-	runtime.EventsEmit(a.ctx, "add-document-response", response)
-}
-func (a *App) emitDocumentAddProgress(progress map[string]interface{}) {
-	a.log.Info(fmt.Sprintf("Emitting add document progress: %+v", progress))
-	runtime.EventsEmit(a.ctx, "add-document-progress", progress)
-}
-
-// handleAddDocumentRequest processes the added document request asynchronously
 func (a *App) handleAddDocumentRequest(request DocumentAddRequest) {
-	// Emit progress event
-	a.emitDocumentAddProgress(map[string]interface{}{
+	runtime.EventsEmit(a.ctx, "query-document-progress", map[string]interface{}{
 		"requestId": request.RequestID,
 		"status":    "processing",
 		"message":   "Adding document to Elasticsearch...",
 	})
 
-	// Call the actual AddElasticDocument method
 	result := a.AddElasticDocument(
 		request.EmbeddingArguments,
 		request.EmbeddingType,
@@ -426,9 +237,7 @@ func (a *App) handleAddDocumentRequest(request DocumentAddRequest) {
 		request.ChunkOverlap,
 	)
 
-	// Determine success based on a result
 	success := result == "Document added successfully"
-
 	response := DocumentAddResponse{
 		RequestID: request.RequestID,
 		Success:   success,
@@ -439,11 +248,201 @@ func (a *App) handleAddDocumentRequest(request DocumentAddRequest) {
 		response.Error = result
 	}
 
-	// Emit the response
-	a.emitDocumentAddResponse(response)
+	runtime.EventsEmit(a.ctx, "query-document-response", response)
 }
 
-// GetAllIndices retrieves all available indices from ElasticSearch
+// Core document processing methods
+func (a *App) queryElasticDocumentWithProgress(request DocumentQueryRequest, processingStartTime time.Time) string {
+	// Add defensive checks
+	if a.operationCtx == nil {
+		return "Error: operation context is nil"
+	}
+
+	steps := []struct {
+		progress int
+		status   string
+		message  string
+		action   func() (interface{}, error)
+	}{
+		{10, "connecting", "Connecting to Elasticsearch...", func() (interface{}, error) {
+			return a.createElasticsearchClient(150000)
+		}},
+		{20, "embedding", "Generating vector embeddings...", func() (interface{}, error) {
+			if len(request.SearchKeywords) == 0 {
+				return nil, fmt.Errorf("search keywords are empty")
+			}
+			return GenerateEmbedWithCancel(a.operationCtx, request.LlamaEmbedArgs, *a.appArgs, strings.Join(request.SearchKeywords, " "))
+		}},
+		{40, "embedding", "Generating prompt embeddings...", func() (interface{}, error) {
+			if request.EmbeddingPrompt == "" {
+				return nil, fmt.Errorf("embedding prompt is empty")
+			}
+			return GenerateEmbedWithCancel(a.ctx, request.LlamaEmbedArgs, *a.appArgs, request.EmbeddingPrompt)
+		}},
+	}
+
+	var elasticClient *ElasticsearchClientWrapper
+	var keywordSearchVector, promptSearchVector []float64
+
+	for i, step := range steps {
+		// Check for cancellation before each step
+		select {
+		case <-a.operationCtx.Done():
+			return "Operation cancelled by user"
+		default:
+		}
+
+		runtime.EventsEmit(a.ctx, "query-document-progress", DocumentQueryProgress{
+			RequestID: request.RequestID,
+			Status:    step.status,
+			Message:   step.message,
+			Progress:  step.progress,
+		})
+
+		result, err := step.action()
+		if err != nil {
+			if errors.Is(a.operationCtx.Err(), context.Canceled) {
+				a.log.Info("Document analysis was cancelled by user")
+				return "Operation cancelled by user"
+			}
+			a.log.Error(fmt.Sprintf("Step %d failed: %s", i, err.Error()))
+			return "Error: " + err.Error()
+		}
+
+		// Add nil checks before type assertions
+		if result == nil {
+			a.log.Error(fmt.Sprintf("Step %d returned nil result", i))
+			return fmt.Sprintf("Error: Step %d returned nil result", i)
+		}
+
+		switch i {
+		case 0:
+			client, ok := result.(*ElasticsearchClientWrapper)
+			if !ok {
+				a.log.Error("Failed to cast result to ElasticsearchClientWrapper")
+				return "Error: Failed to cast elasticsearch client"
+			}
+			elasticClient = client
+		case 1:
+			vector, err := extractEmbeddingVector(result)
+			if err != nil {
+				a.log.Error("Failed to extract keyword search vector: " + err.Error())
+				return "Error: " + err.Error()
+			}
+			keywordSearchVector = vector
+		case 2:
+			vector, err := extractEmbeddingVector(result)
+			if err != nil {
+				a.log.Error("Failed to extract prompt search vector: " + err.Error())
+				return "Error: " + err.Error()
+			}
+			promptSearchVector = vector
+		}
+	}
+
+	// Final nil checks before proceeding
+	if elasticClient == nil {
+		return "Error: Elasticsearch client is nil"
+	}
+	if keywordSearchVector == nil {
+		return "Error: Keyword search vector is nil"
+	}
+	if promptSearchVector == nil {
+		return "Error: Prompt search vector is nil"
+	}
+
+	return a.performSearchAndGeneration(request, elasticClient, keywordSearchVector, promptSearchVector, processingStartTime)
+}
+
+func (a *App) performSearchAndGeneration(request DocumentQueryRequest, elasticClient *ElasticsearchClientWrapper,
+	keywordSearchVector, promptSearchVector []float64, processingStartTime time.Time) string {
+
+	// Progress: Performing searches
+	runtime.EventsEmit(a.ctx, "query-document-progress", DocumentQueryProgress{
+		RequestID: request.RequestID,
+		Status:    "searching",
+		Message:   "Performing vector similarity searches...",
+		Progress:  60,
+	})
+
+	// Convert float64 slices to float32 for the SearchDocumentByIDWithVector function
+	keywordSearchVectorF32 := convertFloat64ToFloat32(keywordSearchVector)
+	promptSearchVectorF32 := convertFloat64ToFloat32(promptSearchVector)
+
+	keywordSearchResults, err := elasticClient.SearchDocumentByIDWithVector(a.ctx, request.IndexID, request.DocumentID, keywordSearchVectorF32, 15)
+	if err != nil {
+		return a.handleSearchError(err, "keywordSearchVector")
+	}
+
+	promptSearchResults, err := elasticClient.SearchDocumentByIDWithVector(a.ctx, request.IndexID, request.DocumentID, promptSearchVectorF32, 15)
+	if err != nil {
+		return a.handleSearchError(err, "promptSearchVector")
+	}
+
+	// Progress: Processing results
+	runtime.EventsEmit(a.ctx, "query-document-progress", DocumentQueryProgress{
+		RequestID: request.RequestID,
+		Status:    "processing",
+		Message:   "Processing search results...",
+		Progress:  80,
+	})
+
+	deduplicatedKeywordResults, deduplicatedPromptResults := removeDuplicateSearchResults(keywordSearchResults, promptSearchResults)
+	combinedSearchContext := deduplicatedKeywordResults + deduplicatedPromptResults
+
+	// Progress: Generating completion
+	runtime.EventsEmit(a.ctx, "query-document-progress", DocumentQueryProgress{
+		RequestID: request.RequestID,
+		Status:    "generating",
+		Message:   "Generating AI completion...",
+		Progress:  90,
+	})
+
+	completionResult := a.generateCompletionWithContext(request.LlamaCliArgs, combinedSearchContext, request.DocumentPrompt, request.PromptType)
+
+	a.saveDocumentQuestionResponse(request, completionResult, time.Since(processingStartTime).Milliseconds())
+
+	// Progress: Complete
+	runtime.EventsEmit(a.ctx, "query-document-progress", DocumentQueryProgress{
+		RequestID: request.RequestID,
+		Status:    "complete",
+		Message:   "Document query completed successfully",
+		Progress:  100,
+	})
+
+	return completionResult
+}
+
+func (a *App) handleSearchError(err error, searchType string) string {
+	if errors.Is(a.operationCtx.Err(), context.Canceled) {
+		a.log.Info("Document analysis was cancelled by user")
+		return "Search cancelled by user"
+	}
+	a.log.Error(fmt.Sprintf("Failed to search with %s embedding: %s", searchType, err.Error()))
+	return "Error: " + err.Error()
+}
+
+func (a *App) saveDocumentQuestionResponse(request DocumentQueryRequest, completionResult string, processingTime int64) {
+	documentQuestionResponse := DocumentQuestionResponse{
+		ID:          bson.NewObjectID(),
+		DocumentID:  request.DocumentID,
+		IndexName:   request.IndexID,
+		EmbedPrompt: request.EmbeddingPrompt,
+		DocPrompt:   request.DocumentPrompt,
+		Response:    completionResult,
+		Keywords:    request.SearchKeywords,
+		PromptType:  request.PromptType,
+		EmbedArgs:   request.LlamaEmbedArgs,
+		CliState:    request.LlamaCliArgs,
+		CreatedAt:   time.Now(),
+		ProcessTime: processingTime,
+	}
+
+	if _, err := SaveDocumentQuestionResponse(a.appArgs, documentQuestionResponse); err != nil {
+		a.log.Error("Failed to save document question response: " + err.Error())
+	}
+}
+
 func (a *App) GetAllIndices() []string {
 	elasticClient, err := a.createElasticsearchClient(5000)
 	if err != nil {
@@ -459,7 +458,6 @@ func (a *App) GetAllIndices() []string {
 	return availableIndices
 }
 
-// GetDocumentsByFieldsSettings searches for documents based on provided field values
 func (a *App) GetDocumentsByFieldsSettings(indexName, metaKeyWords, metaTextDesc, title string) string {
 	elasticClient, err := a.createElasticsearchClient(5000)
 	if err != nil {
@@ -475,7 +473,6 @@ func (a *App) GetDocumentsByFieldsSettings(indexName, metaKeyWords, metaTextDesc
 
 	searchResults, err := elasticClient.SearchDocumentsByFields(a.operationCtx, indexName, searchParameters)
 	if err != nil {
-		// Check if the error is due to context cancellation
 		if errors.Is(a.ctx.Err(), context.Canceled) {
 			a.log.Info("Document search was cancelled by user")
 			return "Search cancelled by user"
@@ -484,7 +481,6 @@ func (a *App) GetDocumentsByFieldsSettings(indexName, metaKeyWords, metaTextDesc
 		return err.Error()
 	}
 
-	// Check for cancellation before processing results
 	if errors.Is(a.ctx.Err(), context.Canceled) {
 		a.log.Info("Document search was cancelled by user")
 		return "Search cancelled by user"
@@ -499,7 +495,6 @@ func (a *App) GetDocumentsByFieldsSettings(indexName, metaKeyWords, metaTextDesc
 	return jsonOutput
 }
 
-// AddElasticDocument adds a document to Elasticsearch with the given parameters
 func (a *App) AddElasticDocument(embeddingArguments LlamaEmbedArgs, embeddingType, indexName,
 	title, metaTextDesc, metaKeyWords, sourceLocation string,
 	chunkSize, chunkOverlap int) string {
@@ -524,7 +519,6 @@ func (a *App) AddElasticDocument(embeddingArguments LlamaEmbedArgs, embeddingTyp
 	return "Document added successfully"
 }
 
-// processDocumentByType processes a document based on its type (csv, text, pdf)
 func (a *App) processDocumentByType(embeddingType, sourceLocation string, chunkSize, chunkOverlap int) ([]Document, error) {
 	switch embeddingType {
 	case "csv":
@@ -538,122 +532,100 @@ func (a *App) processDocumentByType(embeddingType, sourceLocation string, chunkS
 	}
 }
 
-// QueryElasticDocument processes a question against a specific document in ElasticSearch using vector similarity search
+// Legacy methods (consider refactoring these as well in future iterations)
 func (a *App) QueryElasticDocument(llamaCliArgs LlamaCliArgs, llamaEmbedArgs LlamaEmbedArgs,
 	indexID string, documentID, embeddingPrompt string, documentPrompt string, promptType string, searchKeywords []string) string {
 	processingStartTime := time.Now()
-	// Reset context for this operation
 	a.resetContext()
-	completionResult := ""
 
 	select {
 	case <-a.ctx.Done():
 		a.log.Info("Operation was cancelled before starting")
 		return "Operation cancelled by user"
 	default:
-
 		elasticClient, err := a.createElasticsearchClient(150000)
 		if err != nil {
 			return err.Error()
 		}
 
-		// Generate vector embeddings for both keywords and prompt
 		keywordSearchVector, err := GenerateEmbedWithCancel(a.ctx, llamaEmbedArgs, *a.appArgs, strings.Join(searchKeywords, " "))
 		if err != nil {
-			if errors.Is(a.ctx.Err(), context.Canceled) {
-				a.log.Info("Document analysis was cancelled by user")
-				return "Operation cancelled by user"
-			}
-			a.log.Error("Failed to generate keywordSearchVector embedding: " + err.Error())
-			return err.Error()
+			return a.handleEmbeddingError(err, "keywordSearchVector")
 		}
+
 		promptSearchVector, err := GenerateEmbedWithCancel(a.ctx, llamaEmbedArgs, *a.appArgs, embeddingPrompt)
 		if err != nil {
-			// Check if the error is due to context cancellation
-			if errors.Is(a.ctx.Err(), context.Canceled) {
-				a.log.Info("Document analysis was cancelled by user")
-				return "Search cancelled by user"
-			}
-			a.log.Error("Failed to generate embeddingPrompt embedding: " + err.Error())
-			return err.Error()
+			return a.handleEmbeddingError(err, "promptSearchVector")
 		}
 
-		// Perform vector similarity searches using both keyword and prompt embeddings
 		keywordSearchResults, err := elasticClient.SearchDocumentByIDWithVector(a.ctx, indexID, documentID, keywordSearchVector, 15)
 		if err != nil {
-			// Check if the error is due to context cancellation
-			if errors.Is(a.ctx.Err(), context.Canceled) {
-				a.log.Info("Document analysis was cancelled by user")
-				return "Search cancelled by user"
-			}
-			a.log.Error("Failed to search with keywordSearchVector embedding: " + err.Error())
-			return err.Error()
+			return a.handleSearchError(err, "keywordSearchVector")
 		}
+
 		promptSearchResults, err := elasticClient.SearchDocumentByIDWithVector(a.ctx, indexID, documentID, promptSearchVector, 15)
 		if err != nil {
-			// Check if the error is due to context cancellation
-			if errors.Is(a.ctx.Err(), context.Canceled) {
-				a.log.Info("Document analysis was cancelled by user")
-				return "Search cancelled by user"
-			}
-			a.log.Error("Failed to search with promptSearchVector embedding: " + err.Error())
-			return err.Error()
+			return a.handleSearchError(err, "promptSearchVector")
 		}
 
-		// Remove duplicates between keyword and prompt search results
 		deduplicatedKeywordResults, deduplicatedPromptResults := removeDuplicateSearchResults(keywordSearchResults, promptSearchResults)
-
-		// Combine both deduplicated search results for context generation
 		combinedSearchContext := deduplicatedKeywordResults + deduplicatedPromptResults
 
-		// Generate final completion using combined context
-		completionResult = a.generateCompletionWithContext(llamaCliArgs, combinedSearchContext, documentPrompt, promptType)
+		completionResult := a.generateCompletionWithContext(llamaCliArgs, combinedSearchContext, documentPrompt, promptType)
 
 		totalProcessingTime := time.Since(processingStartTime).Milliseconds()
+		a.saveDocumentQuestionResponseLegacy(documentID, indexID, embeddingPrompt, documentPrompt, completionResult, searchKeywords, promptType, llamaEmbedArgs, llamaCliArgs, totalProcessingTime)
 
-		// Create and save the document question response with all relevant metadata
-		documentQuestionResponse := DocumentQuestionResponse{
-			ID:          bson.NewObjectID(),
-			DocumentID:  documentID,
-			IndexName:   indexID,
-			EmbedPrompt: embeddingPrompt,
-			DocPrompt:   documentPrompt,
-			Response:    completionResult,
-			Keywords:    searchKeywords,
-			PromptType:  promptType,
-			EmbedArgs:   llamaEmbedArgs,
-			CliState:    llamaCliArgs,
-			CreatedAt:   time.Now(),
-			ProcessTime: totalProcessingTime,
-		}
-
-		if _, err = SaveDocumentQuestionResponse(a.appArgs, documentQuestionResponse); err != nil {
-			a.log.Error("Failed to save document question response: " + err.Error())
-			return ""
-		}
+		return completionResult
 	}
-	return completionResult
 }
 
-// generateCompletionWithPromptType generates a completion with specific prompt type formatting
+func (a *App) handleEmbeddingError(err error, embeddingType string) string {
+	if errors.Is(a.ctx.Err(), context.Canceled) {
+		a.log.Info("Document analysis was cancelled by user")
+		return "Operation cancelled by user"
+	}
+	a.log.Error(fmt.Sprintf("Failed to generate %s embedding: %s", embeddingType, err.Error()))
+	return err.Error()
+}
+
+func (a *App) saveDocumentQuestionResponseLegacy(documentID, indexID, embeddingPrompt, documentPrompt, completionResult string, searchKeywords []string, promptType string, llamaEmbedArgs LlamaEmbedArgs, llamaCliArgs LlamaCliArgs, totalProcessingTime int64) {
+	documentQuestionResponse := DocumentQuestionResponse{
+		ID:          bson.NewObjectID(),
+		DocumentID:  documentID,
+		IndexName:   indexID,
+		EmbedPrompt: embeddingPrompt,
+		DocPrompt:   documentPrompt,
+		Response:    completionResult,
+		Keywords:    searchKeywords,
+		PromptType:  promptType,
+		EmbedArgs:   llamaEmbedArgs,
+		CliState:    llamaCliArgs,
+		CreatedAt:   time.Now(),
+		ProcessTime: totalProcessingTime,
+	}
+
+	if _, err := SaveDocumentQuestionResponse(a.appArgs, documentQuestionResponse); err != nil {
+		a.log.Error("Failed to save document question response: " + err.Error())
+	}
+}
+
 func (a *App) generateCompletionWithPromptType(llamaCliArgs LlamaCliArgs, llamaEmbedArgs LlamaEmbedArgs,
 	userPrompt, promptType, documentID, indexName, embeddingPrompt, documentPrompt string, searchKeywords []string) string {
 
 	processingStartTime := time.Now()
 
-	// Format the prompt according to the specified prompt type
 	formattedPrompt, err := HandlePromptType(a.log, promptType, userPrompt)
 	if err != nil {
 		a.log.Error("Failed to handle prompt type: " + err.Error())
 		return err.Error()
 	}
 
-	// Save the formatted prompt for debugging/logging purposes
 	filename := fmt.Sprintf("docQuery_%s_%s.txt", documentID, time.Now().Format("20060102_150405"))
 	if err := SaveAsText(a.appArgs.PromptTempPath, filename, formattedPrompt, a.log); err != nil {
 		a.log.Error("Failed to save prompt: " + err.Error())
 	}
-	// Configure CLI arguments with the formatted prompt and generate completion
+
 	llamaCliArgs.PromptText = formattedPrompt
 	cliArgumentsArray := LlamaCliStructToArgs(llamaCliArgs)
 	generatedOutput, err := GenerateSingleCompletionWithCancel(a.ctx, *a.appArgs, cliArgumentsArray)
@@ -665,43 +637,19 @@ func (a *App) generateCompletionWithPromptType(llamaCliArgs LlamaCliArgs, llamaE
 	completionOutputString := string(generatedOutput)
 	totalProcessingTime := time.Since(processingStartTime).Milliseconds()
 
-	// Create and save the document question response with all relevant metadata
-	documentQuestionResponse := DocumentQuestionResponse{
-		ID:          bson.NewObjectID(),
-		DocumentID:  documentID,
-		IndexName:   indexName,
-		EmbedPrompt: embeddingPrompt,
-		DocPrompt:   documentPrompt,
-		Response:    completionOutputString,
-		Keywords:    searchKeywords,
-		EmbedArgs:   llamaEmbedArgs,
-		CliState:    llamaCliArgs,
-		CreatedAt:   time.Now(),
-		ProcessTime: totalProcessingTime,
-	}
-
-	if _, err = SaveDocumentQuestionResponse(a.appArgs, documentQuestionResponse); err != nil {
-		a.log.Error("Failed to save document question response: " + err.Error())
-		return ""
-	}
+	a.saveDocumentQuestionResponseLegacy(documentID, indexName, embeddingPrompt, documentPrompt, completionOutputString, searchKeywords, promptType, llamaEmbedArgs, llamaCliArgs, totalProcessingTime)
 
 	return completionOutputString
 }
 
-// generateCompletionWithContext generates a completion using the provided context and document prompt
 func (a *App) generateCompletionWithContext(llamaCliArgs LlamaCliArgs, searchContext string, documentPrompt string, promptType string) string {
-	// Create a template that combines the document prompt with the search context
 	contextualPromptTemplate := documentPrompt + "\n\nContext: %s\n\n"
 	promptWithContext := fmt.Sprintf(contextualPromptTemplate, searchContext)
 
-	// Generate completion with the contextualized prompt
 	return a.generateCompletionWithPromptType(llamaCliArgs, LlamaEmbedArgs{}, promptWithContext, promptType, "", "", "", documentPrompt, []string{})
 }
 
-// removeDuplicateSearchResults removes duplicate strings between two search result sets
-// It preserves all items from keywordResults and only unique items from promptResults
 func removeDuplicateSearchResults(keywordResults, promptResults string) (string, string) {
-	// Handle empty result cases
 	if keywordResults == "" && promptResults == "" {
 		return "", ""
 	}
@@ -714,16 +662,13 @@ func removeDuplicateSearchResults(keywordResults, promptResults string) (string,
 		return keywordResults, ""
 	}
 
-	// If both results are identical, keep only keywordResults to avoid complete duplication
 	if keywordResults == promptResults {
 		return keywordResults, ""
 	}
 
-	// Split results into individual lines for granular duplicate detection
 	keywordResultLines := strings.Split(keywordResults, "\n")
 	promptResultLines := strings.Split(promptResults, "\n")
 
-	// Create a lookup map to track lines that exist in keywordResults
 	keywordLinesMap := make(map[string]bool)
 	for _, line := range keywordResultLines {
 		trimmedLine := strings.TrimSpace(line)
@@ -732,17 +677,14 @@ func removeDuplicateSearchResults(keywordResults, promptResults string) (string,
 		}
 	}
 
-	// Filter out duplicate lines from promptResults
 	var uniquePromptResultLines []string
 	for _, line := range promptResultLines {
 		trimmedLine := strings.TrimSpace(line)
-		// Only include non-empty lines that don't exist in keywordResults
 		if trimmedLine != "" && !keywordLinesMap[trimmedLine] {
 			uniquePromptResultLines = append(uniquePromptResultLines, line)
 		}
 	}
 
-	// Reconstruct the filtered prompt results
 	deduplicatedPromptResults := strings.Join(uniquePromptResultLines, "\n")
 
 	return keywordResults, deduplicatedPromptResults

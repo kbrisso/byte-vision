@@ -3,8 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"text/template"
+
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 type PromptData interface {
@@ -97,9 +98,9 @@ func (pr *PromptRegistry) registerPrompts() {
 		"Qwen3": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
-				SystemPrompt:    "<|im_start|>system\r\nYou're a helpful AI assistant.<|im_end|>\r\n",
-				UserPrompt:      "<|im_start|>user\r\n",
-				AssistantPrompt: "<|im_end|>\r\n<|im_start|>assistant\r\n<think>\n</think>\n",
+				SystemPrompt:    "",
+				UserPrompt:      "<|im_start|>\nuser You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\n Please follow these instructions:\n",
+				AssistantPrompt: "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
 			},
 		},
 		"Granite": {

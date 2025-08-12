@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
+
 	"github.com/wailsapp/wails/v2/pkg/logger"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"go.mongodb.org/mongo-driver/v2/mongo"
-	"os"
 )
 
 type App struct {
@@ -36,10 +37,8 @@ func (a *App) CancelProcess() string {
 func (a *App) Startup(ctx context.Context) {
 	a.log.Info("App startup called")
 	a.ctx = ctx
-
 	a.log.Info("Setting up event listeners...")
 	a.SetupEventListeners()
-	a.SetupEventInferenceListener()
 	a.log.Info("Startup complete")
 }
 
@@ -179,4 +178,8 @@ func (a *App) ChooseImageFile() string {
 		return err.Error()
 	}
 	return ret
+}
+func (a *App) SetupEventListeners() {
+	eventHandler := NewEventHandler(a)
+	eventHandler.SetupAllEventListeners()
 }

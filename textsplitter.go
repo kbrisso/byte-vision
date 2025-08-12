@@ -2,17 +2,42 @@ package main
 
 import (
 	"fmt"
-	"github.com/jonathanhecl/chunker"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/jonathanhecl/chunker"
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 var (
 	defaultSeparators                 = []string{"\n\n", "\n", " "}
 	defaultLengthFunction LenFunction = func(s string) int { return len(s) }
 )
+
+var StopWordsSet = map[string]struct{}{
+	"i": {}, "me": {}, "my": {}, "myself": {}, "we": {}, "our": {}, "ours": {}, "ourselves": {},
+	"you": {}, "your": {}, "yours": {}, "yourself": {}, "yourselves": {},
+	"he": {}, "him": {}, "his": {}, "himself": {},
+	"she": {}, "her": {}, "hers": {}, "herself": {},
+	"it": {}, "its": {}, "itself": {},
+	"they": {}, "them": {}, "their": {}, "theirs": {}, "themselves": {},
+	"what": {}, "which": {}, "who": {}, "whom": {},
+	"this": {}, "that": {}, "these": {}, "those": {},
+	"am": {}, "is": {}, "are": {}, "was": {}, "were": {}, "be": {}, "been": {}, "being": {},
+	"have": {}, "has": {}, "had": {}, "having": {},
+	"do": {}, "does": {}, "did": {}, "doing": {},
+	"a": {}, "an": {}, "the": {},
+	"and": {}, "but": {}, "if": {}, "or": {}, "because": {}, "as": {}, "until": {}, "while": {},
+	"of": {}, "at": {}, "by": {}, "for": {}, "with": {}, "about": {}, "against": {}, "between": {},
+	"into": {}, "through": {}, "during": {}, "before": {}, "after": {}, "above": {}, "below": {},
+	"to": {}, "from": {}, "up": {}, "down": {}, "in": {}, "out": {}, "on": {}, "off": {}, "over": {}, "under": {},
+	"again": {}, "further": {}, "then": {}, "once": {},
+	"here": {}, "there": {}, "when": {}, "where": {}, "why": {}, "how": {},
+	"all": {}, "any": {}, "both": {}, "each": {}, "few": {}, "more": {}, "most": {}, "other": {}, "some": {}, "such": {},
+	"no": {}, "nor": {}, "not": {}, "only": {}, "own": {}, "same": {}, "so": {}, "than": {}, "too": {}, "very": {},
+	"s": {}, "t": {}, "can": {}, "will": {}, "just": {}, "don": {}, "should": {}, "now": {},
+}
 
 type TextSplitter struct {
 	chunkSize      int
@@ -109,6 +134,8 @@ func (r *RecursiveCharacterTextSplitter) SplitDocuments(log logger.Logger, appAr
 			}
 		}
 
+		doc.Content = RemoveStopWordsFast(doc.Content)
+
 		err := SaveAsText(appArgs.PromptTempPath, filename, doc.Content, log)
 		if err != nil {
 			log.Error(err.Error())
@@ -185,4 +212,60 @@ func (r *RecursiveCharacterTextSplitter) SplitText(appArgs DefaultAppArgs, log l
 	}
 
 	return out
+}
+func RemoveStopWordsFast(text string) string {
+	if text == "" {
+		return ""
+	}
+
+	// Use byte slice for maximum performance
+	input := []byte(text)
+	result := make([]byte, 0, len(input))
+
+	i := 0
+	for i < len(input) {
+		// Skip leading whitespace
+		for i < len(input) && isWhitespace(input[i]) {
+			i++
+		}
+
+		if i >= len(input) {
+			break
+		}
+
+		// Find word boundary
+		wordStart := i
+		for i < len(input) && !isWhitespace(input[i]) && !isPunctuation(input[i]) {
+			i++
+		}
+
+		if i > wordStart {
+			word := string(input[wordStart:i])
+			cleanWord := strings.ToLower(word)
+
+			// Check if not a stop word
+			if _, isStopWord := StopWordsSet[cleanWord]; !isStopWord {
+				if len(result) > 0 {
+					result = append(result, ' ')
+				}
+				result = append(result, input[wordStart:i]...)
+			}
+		}
+
+		// Skip punctuation
+		for i < len(input) && (isWhitespace(input[i]) || isPunctuation(input[i])) {
+			i++
+		}
+	}
+
+	return string(result)
+}
+
+func isWhitespace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r'
+}
+
+func isPunctuation(b byte) bool {
+	return (b >= 33 && b <= 47) || (b >= 58 && b <= 64) ||
+		(b >= 91 && b <= 96) || (b >= 123 && b <= 126)
 }

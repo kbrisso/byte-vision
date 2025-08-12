@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   Alert,
   Button,
@@ -9,312 +9,78 @@ import {
   Row,
   Spinner,
 } from "react-bootstrap";
-import { pdf } from "@react-pdf/renderer";
+import MarkdownPreview from "@uiw/react-markdown-preview";
 
-import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
-import { CancelProcess } from "../wailsjs/go/main/App.js";
+import { LogError } from "../wailsjs/runtime/runtime.js";
 import "../public/main.css";
 
 import {
   useChatState,
-  useInferenceState,
   useSettingsState,
 } from "./StoreConfig.jsx";
 import { PROMPT_TYPES } from "./CommonUtils.jsx";
 import { PDFConversationDocument } from "./CommonUtils.jsx";
 
-// Extracted PDF export utility
-const exportConversationToPDF = async (chatHistory, documentTitle) => {
-  try {
-    const blob = await pdf(
-      <PDFConversationDocument
-        chatHistory={chatHistory}
-        documentTitle={documentTitle}
-      />,
-    ).toBlob();
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `conversation-export-${documentTitle || "session"}-${new Date().toISOString().split("T")[0]}.pdf`;
-    link.click();
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    LogError("PDF conversation export failed: " + error);
-    throw error;
-  }
-};
-
-// Custom hook for managing cancellation
-const useCancellation = () => {
-  const abortControllerRef = useRef(null);
-
-  const createController = useCallback(() => {
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    return controller;
-  }, []);
-
-  const cancel = useCallback(async () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      try {
-        await CancelProcess();
-        LogInfo("Inference cancelled by user");
-      } catch (error) {
-        LogError("Failed to cancel process: " + error);
-      } finally {
-        abortControllerRef.current = null;
-      }
-    }
-  }, []);
-
-  const cleanup = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  }, []);
-
-  return {
-    createController,
-    cancel,
-    cleanup,
-    isActive: !!abortControllerRef.current,
-  };
-};
-
 const InferenceCompletionForm = () => {
-  // Store state
-  const { isGenerating, selectedPromptType, setSelectedPromptType } =
-    useInferenceState();
+  // Store state - everything is now managed by ChatSliceManager
+  // Data
   const {
     chatHistory,
     savedChats,
-    loadSavedChat,
-    loadSavedChats,
-    hoveredHistoryId,
-    setHoveredHistoryId,
-    clearChatHistory,
     currentMessage,
-    isLoadingHistory,
     selectedChatId,
     textareaFocused,
+    hoveredHistoryId,
+    isLoadingHistory,
     isInitialized,
+    isExportingPDF,
+
+    // Generation State
+    isGenerating,
+    selectedPromptType,
+    setSelectedPromptType,
+
+    // Actions
+    loadSavedChat,
+    setHoveredHistoryId,
     setTextareaFocused,
     setCurrentMessage,
-    generateCompletion,
-    setInitialized,
+    initializeChat,
+
+    // UI Handlers
+    handleClear,
+    handleCancel,
+    handleSubmit,
+    handleKeyDown,
+    handleExportPDF,
+
+    // Utilities
+    formatDate,
+    extractUserQuestion,
+
+    // Computed values
+    getIsButtonDisabled,
+    getIsLoading,
   } = useChatState();
+
   const { settings, settingsLoading } = useSettingsState();
-
-  // Local state for PDF export
-  const [isExportingPDF, setIsExportingPDF] = useState(false);
-
-  // Custom hooks
-  const {
-    createController,
-    cancel,
-    cleanup,
-    isActive: isCancellable,
-  } = useCancellation();
 
   // Refs
   const chatContainerRef = useRef(null);
 
-  // Memoized values
-  const isButtonDisabled = useMemo(
-    () => !selectedPromptType || !currentMessage.trim() || isGenerating,
-    [selectedPromptType, currentMessage, isGenerating],
+  // Computed values from ChatSliceManager
+  const isButtonDisabled = getIsButtonDisabled(
+    selectedPromptType,
+    currentMessage,
   );
-
-  const isLoading = settingsLoading || !isInitialized;
-
-  // Stable callbacks
-  const sendMessage = useCallback(
-    async (promptType, message, cliState) => {
-      try {
-        const controller = createController();
-        return await generateCompletion(promptType, message, cliState);
-      } catch (error) {
-        LogError(`Failed to send message: ${error}`);
-        throw error;
-      }
-    },
-    [generateCompletion, createController],
-  );
-
-  const initializeChat = useCallback(async () => {
-    if (!isInitialized) {
-      try {
-        await loadSavedChats();
-        setInitialized(true);
-      } catch (error) {
-        LogError(`Failed to initialize chat: ${error}`);
-      }
-    }
-  }, [isInitialized, loadSavedChats, setInitialized]);
-
-  const handleSubmit = useCallback(
-    async (event) => {
-      event.preventDefault();
-
-      if (isButtonDisabled) return;
-
-      try {
-        const cliState = {
-          ...settings?.llamaCli,
-          PromptText: currentMessage,
-        };
-
-        await sendMessage(selectedPromptType, currentMessage, cliState);
-      } catch (error) {
-        LogError(`Submit error: ${error}`);
-      }
-    },
-    [
-      isButtonDisabled,
-      currentMessage,
-      sendMessage,
-      selectedPromptType,
-      settings?.llamaCli,
-    ],
-  );
-
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter" && !e.shiftKey && !isButtonDisabled) {
-        e.preventDefault();
-        handleSubmit(e);
-      }
-    },
-    [isButtonDisabled, handleSubmit],
-  );
-
-  const handleExportPDF = useCallback(async () => {
-    if (!chatHistory.length || isExportingPDF) return;
-
-    try {
-      setIsExportingPDF(true);
-      await exportConversationToPDF(chatHistory, "Inference Chat");
-    } catch (error) {
-      LogError(`PDF export failed: ${error}`);
-    } finally {
-      setIsExportingPDF(false);
-    }
-  }, [chatHistory, isExportingPDF]);
-
-  // Format date for display in chat history
-  const formatDate = useCallback((dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 1) {
-      return "Today";
-    } else if (diffDays === 2) {
-      return "Yesterday";
-    } else if (diffDays <= 7) {
-      return `${diffDays - 1} days ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
-  }, []);
-
-  // Extract user question from a saved chat
-  const extractUserQuestion = useCallback((questionText) => {
-    if (!questionText) return "";
-    const parts = questionText.split("User");
-    if (parts.length > 1) {
-      return parts[1].trim();
-    }
-    return questionText.trim();
-  }, []);
-
-  // Format message text with code block rendering
-  const formatMessageText = useCallback((text) => {
-    if (!text) return "";
-
-    if (text.includes("```")) {
-      const parts = text.split(/(```[\s\S]*?```)/g);
-      return (
-        <>
-          {parts.map((part, i) => {
-            if (part.startsWith("```") && part.endsWith("```")) {
-              const code = part.slice(3, -3);
-              const firstLineBreak = code.indexOf("\n");
-              const language =
-                firstLineBreak > 0 ? code.slice(0, firstLineBreak).trim() : "";
-              const codeContent =
-                firstLineBreak > 0 ? code.slice(firstLineBreak + 1) : code;
-
-              return (
-                <div
-                  key={i}
-                  style={{
-                    backgroundColor: "var(--bg-secondary)",
-                    border: "1px solid var(--border-secondary)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "var(--spacing-sm)",
-                    marginBottom: "var(--spacing-sm)",
-                    fontFamily: "monospace",
-                    fontSize: "0.8rem",
-                    overflow: "auto",
-                  }}
-                >
-                  {language && (
-                    <div
-                      style={{
-                        color: "var(--text-quaternary)",
-                        fontSize: "0.7rem",
-                        marginBottom: "var(--spacing-xs)",
-                      }}
-                    >
-                      {language}
-                    </div>
-                  )}
-                  <pre
-                    style={{
-                      margin: 0,
-                      color: "var(--text-primary)",
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {codeContent}
-                  </pre>
-                </div>
-              );
-            } else {
-              return part.split("\n\n").map((paragraph, j) => (
-                <p
-                  key={`${i}-${j}`}
-                  style={{ marginBottom: "0.5rem", margin: 0 }}
-                >
-                  {paragraph}
-                </p>
-              ));
-            }
-          })}
-        </>
-      );
-    }
-
-    return text.split("\n\n").map((paragraph, i) => (
-      <p key={i} style={{ marginBottom: "0.5rem", margin: 0 }}>
-        {paragraph}
-      </p>
-    ));
-  }, []);
+  const isLoading = getIsLoading(settingsLoading);
 
   // Effects
   useEffect(() => {
-    return cleanup; // Cleanup on unmount
-  }, [cleanup]);
-
-  useEffect(() => {
     if (!settingsLoading && !isInitialized) {
-      initializeChat();
+      initializeChat().catch((error) => {
+        LogError(`Failed to initialize chat: ${error}`);
+      });
     }
   }, [settingsLoading, isInitialized, initializeChat]);
 
@@ -330,6 +96,25 @@ const InferenceCompletionForm = () => {
         chatContainerRef.current.scrollHeight;
     }
   }, [chatHistory]);
+
+  // Wrapped handlers that pass required parameters
+  const onSubmit = useCallback(
+    (e) => {
+      handleSubmit(e, selectedPromptType, currentMessage, settings);
+    },
+    [handleSubmit, selectedPromptType, currentMessage, settings],
+  );
+
+  const onKeyDown = useCallback(
+    (e) => {
+      handleKeyDown(e, selectedPromptType, currentMessage, settings);
+    },
+    [handleKeyDown, selectedPromptType, currentMessage, settings],
+  );
+
+  const onExportPDF = useCallback(() => {
+    handleExportPDF(PDFConversationDocument);
+  }, [handleExportPDF]);
 
   // Loading state
   if (isLoading) {
@@ -514,9 +299,7 @@ const InferenceCompletionForm = () => {
                       >
                         <div
                           style={{ fontSize: "2rem", marginBottom: "0.5rem" }}
-                        >
-                          💬
-                        </div>
+                        ></div>
                         <div>Ready to start your conversation!</div>
                         <div
                           style={{
@@ -532,7 +315,7 @@ const InferenceCompletionForm = () => {
                       chatHistory.map((msg, index) => (
                         <div
                           key={`${msg.id || "msg"}-${index}-${msg.timestamp || Date.now()}`}
-                          className={`d-flex ${msg.sender === "user" ? "justify-content-end" : "justify-content-start"}`}
+                          className={`d-flex ${msg.role === "user" ? "justify-content-end" : "justify-content-start"}`}
                           style={{ marginBottom: "var(--spacing-md)" }}
                         >
                           <div
@@ -550,13 +333,13 @@ const InferenceCompletionForm = () => {
                                 marginBottom: "0.375rem",
                                 color: "var(--text-quaternary)",
                                 textAlign:
-                                  msg.sender === "user" ? "right" : "left",
+                                  msg.role === "user" ? "right" : "left",
                               }}
                             >
-                              {msg.sender === "user"
+                              {msg.role === "user"
                                 ? "You"
-                                : msg.sender === "system"
-                                  ? "System"
+                                : msg.role === "error"
+                                  ? "System Error"
                                   : "AI Assistant"}
                             </div>
                             <div
@@ -568,24 +351,27 @@ const InferenceCompletionForm = () => {
                                 lineHeight: 1.4,
                                 fontSize: "0.8rem",
                                 backgroundColor:
-                                  msg.sender === "user"
+                                  msg.role === "user"
                                     ? "#334155"
-                                    : msg.sender === "system"
+                                    : msg.role === "error"
                                       ? "#dc3545"
-                                      : "var(--bg-input)",
+                                      : msg.isLoading
+                                        ? "#f8f9fa"
+                                        : "var(--bg-input)",
                                 color:
-                                  msg.sender === "user" ||
-                                  msg.sender === "system"
+                                  msg.role === "user" || msg.role === "error"
                                     ? "#ffffff"
-                                    : "var(--text-primary)",
+                                    : msg.isLoading
+                                      ? "#6c757d"
+                                      : "var(--text-primary)",
                                 border:
-                                  msg.sender === "assistant"
+                                  msg.role === "assistant"
                                     ? "1px solid var(--border-secondary)"
                                     : "none",
                                 borderBottomRightRadius:
-                                  msg.sender === "user" ? "0.125rem" : "0.5rem",
+                                  msg.role === "user" ? "0.125rem" : "0.5rem",
                                 borderBottomLeftRadius:
-                                  msg.sender === "assistant"
+                                  msg.role === "assistant"
                                     ? "0.125rem"
                                     : "0.5rem",
                               }}
@@ -600,9 +386,15 @@ const InferenceCompletionForm = () => {
                                   <span>AI is thinking...</span>
                                 </div>
                               ) : (
-                                formatMessageText(msg.content)
+                                <MarkdownPreview
+                                  source={msg.content || "No content"}
+                                  style={{
+                                    padding: 0,
+                                    backgroundColor: "transparent",
+                                  }}
+                                />
                               )}
-                              {msg.processTime && (
+                              {msg.processingTime && (
                                 <div
                                   style={{
                                     fontSize: "0.65rem",
@@ -611,7 +403,8 @@ const InferenceCompletionForm = () => {
                                   }}
                                 >
                                   Generated in{" "}
-                                  {(msg.processTime / 1000).toFixed(2)} seconds
+                                  {(msg.processingTime / 1000).toFixed(2)}{" "}
+                                  seconds
                                 </div>
                               )}
                             </div>
@@ -622,7 +415,7 @@ const InferenceCompletionForm = () => {
                                 marginTop: "0.375rem",
                                 fontWeight: 500,
                                 textAlign:
-                                  msg.sender === "user" ? "right" : "left",
+                                  msg.role === "user" ? "right" : "left",
                               }}
                             >
                               {new Date(msg.timestamp).toLocaleTimeString()}
@@ -636,13 +429,13 @@ const InferenceCompletionForm = () => {
 
                 {/* Input Section */}
                 <div style={{ marginTop: "var(--spacing-md)", flexShrink: 0 }}>
-                  <Form onSubmit={handleSubmit}>
+                  <Form onSubmit={onSubmit}>
                     <Form.Control
                       as="textarea"
                       id="chat-input"
                       value={currentMessage}
                       onChange={(e) => setCurrentMessage(e.target.value)}
-                      onKeyDown={handleKeyDown}
+                      onKeyDown={onKeyDown}
                       className="theme-form-control"
                       onFocus={() => setTextareaFocused(true)}
                       onBlur={() => setTextareaFocused(false)}
@@ -665,19 +458,22 @@ const InferenceCompletionForm = () => {
                         <Button
                           variant="outline-secondary"
                           size="sm"
-                          onClick={clearChatHistory}
+                          onClick={handleClear}
                           className="theme-btn-secondary"
-                          disabled={chatHistory.length === 0}
+                          disabled={
+                            chatHistory.length === 0 && !currentMessage.trim()
+                          }
                         >
                           <i className="bi bi-trash me-1"></i>
                           Clear
                         </Button>
+
                         <Button
                           className="theme-btn-secondary"
                           variant="outline-secondary"
                           size="sm"
                           disabled={!chatHistory?.length || isExportingPDF}
-                          onClick={handleExportPDF}
+                          onClick={onExportPDF}
                         >
                           {isExportingPDF ? (
                             <>
@@ -695,12 +491,12 @@ const InferenceCompletionForm = () => {
                             </>
                           )}
                         </Button>
-                        {/* Cancel Button */}
-                        {isGenerating && isCancellable && (
+
+                        {isGenerating && (
                           <Button
                             variant="outline-danger"
                             size="sm"
-                            onClick={cancel}
+                            onClick={handleCancel}
                             className="theme-btn-danger"
                           >
                             <i className="bi bi-x-circle me-1"></i>
@@ -787,9 +583,7 @@ const InferenceCompletionForm = () => {
                     >
                       <div
                         style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}
-                      >
-                        📭
-                      </div>
+                      ></div>
                       <div>No conversations yet</div>
                       <div
                         style={{

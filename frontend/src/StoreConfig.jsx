@@ -2,15 +2,16 @@ import { create } from "zustand";
 import { devtools, persist, subscribeWithSelector } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { useShallow } from "zustand/shallow";
+import { useEffect } from "react";
+
+import { LogInfo } from "../wailsjs/runtime/runtime.js";
 
 import { createAppSlice } from "./AppSliceManager.jsx";
 import { createChatSlice } from "./ChatSliceManager.jsx";
 import { createDocumentSlice } from "./DocumentSlice.jsx";
-import { createInferenceSlice } from "./InferenceStateSlice.jsx";
 import { createParserSlice } from "./DocumentParserSlice.jsx";
 import { createSettingsSlice } from "./SettingsSliceManager.jsx";
 import { createUISlice } from "./UISliceManager.jsx";
-import {LogInfo} from "../wailsjs/runtime/runtime.js";
 
 // Store configuration
 const storeConfig = {
@@ -24,8 +25,9 @@ const storeConfig = {
     // Settings (full persistence)
     settings: state.settings,
 
-    // Chat state (partial persistence)
+    // Chat state (partial persistence) - UPDATED
     selectedPromptType: state.selectedPromptType,
+    savedChats: state.savedChats, // Persist saved chats
 
     // UI preferences
     sidebarCollapsed: state.sidebarCollapsed,
@@ -41,10 +43,12 @@ const storeConfig = {
   // State migration for version updates
   migrate: (persistedState, version) => {
     if (version < 1) {
-      // Migration logic for version 1
       return {
         ...persistedState,
         // Add any new default values or transform existing ones
+        currentRequestId: null,
+        progressMessage: null,
+        eventListenersInitialized: false,
       };
     }
     return persistedState;
@@ -53,20 +57,31 @@ const storeConfig = {
   // Storage options
   storage: {
     getItem: (name) => {
-      LogInfo(`Getting name ${name} from localStorage`)
+      LogInfo(`Getting ${name} from localStorage`);
       const str = localStorage.getItem(name);
       if (!str) return null;
       try {
-        LogInfo(`Getting str ${str} from localStorage`)
+        LogInfo(
+          `Retrieved data from localStorage: ${str.substring(0, 100)}...`,
+        );
         return JSON.parse(str);
-      } catch {
+      } catch (error) {
+        LogInfo(`Failed to parse localStorage data: ${error.message}`);
         return null;
       }
     },
     setItem: (name, value) => {
-      localStorage.setItem(name, JSON.stringify(value));
+      try {
+        localStorage.setItem(name, JSON.stringify(value));
+        LogInfo(`Saved ${name} to localStorage`);
+      } catch (error) {
+        LogInfo(`Failed to save to localStorage: ${error.message}`);
+      }
     },
-    removeItem: (name) => localStorage.removeItem(name),
+    removeItem: (name) => {
+      localStorage.removeItem(name);
+      LogInfo(`Removed ${name} from localStorage`);
+    },
   },
 };
 
@@ -78,7 +93,6 @@ export const useStore = create()(
           ...createAppSlice(...args),
           ...createChatSlice(...args),
           ...createDocumentSlice(...args),
-          ...createInferenceSlice(...args),
           ...createParserSlice(...args),
           ...createSettingsSlice(...args),
           ...createUISlice(...args),
@@ -92,7 +106,83 @@ export const useStore = create()(
     ),
   ),
 );
-// Create selectors as separate functions to avoid recreation on each render
+
+// FIXED: Updated chat state selector with all required properties
+const selectChatState = (state) => ({
+  // Core State
+  selectedPromptType: state.selectedPromptType,
+  currentMessage: state.currentMessage,
+  chatHistory: state.chatHistory,
+  savedChats: state.savedChats,
+  selectedChatId: state.selectedChatId,
+  hoveredHistoryId: state.hoveredHistoryId,
+  textareaFocused: state.textareaFocused,
+  setSelectedChatId: state.setSelectedChatId,
+  setLoadingHistory: state.setLoadingHistory,
+  setSavedChats: state.setSavedChats,
+
+  // Generation State
+  isGenerating: state.isGenerating,
+  generationError: state.generationError,
+  currentRequestId: state.currentRequestId, // ADDED
+  progressMessage: state.progressMessage, // ADDED
+
+  // Loading State
+  isLoadingHistory: state.isLoadingHistory,
+  isInitialized: state.isInitialized,
+  isExportingPDF: state.isExportingPDF,
+
+  // Event State
+  eventListenersInitialized: state.eventListenersInitialized, // ADDED
+
+  // Basic Actions
+  setSelectedPromptType: state.setSelectedPromptType,
+  setCurrentMessage: state.setCurrentMessage,
+  setTextareaFocused: state.setTextareaFocused,
+  setHoveredHistoryId: state.setHoveredHistoryId,
+  setInitialized: state.setInitialized,
+  clearGenerationError: state.clearGenerationError,
+  clearChatHistory: state.clearChatHistory,
+
+  // Generation Actions
+  setGenerating: state.setGenerating,
+  setGenerationError: state.setGenerationError,
+  setCurrentRequestId: state.setCurrentRequestId, // ADDED
+  setProgressMessage: state.setProgressMessage, // ADDED
+
+  // Event Management Actions - ADDED
+  initializeEventListeners: state.initializeEventListeners,
+  cleanupEventListeners: state.cleanupEventListeners,
+  handleInferenceResponse: state.handleInferenceResponse,
+  handleInferenceProgress: state.handleInferenceProgress,
+
+  // Chat Actions
+  loadSavedChat: state.loadSavedChat,
+  loadSavedChats: state.loadSavedChats,
+  initializeChat: state.initializeChat,
+
+  // Message Actions
+  addMessageToChat: state.addMessageToChat,
+  updateMessageInChat: state.updateMessageInChat,
+  removeMessageFromChat: state.removeMessageFromChat,
+
+  // UI Handler Actions
+  handleClear: state.handleClear,
+  handleCancel: state.handleCancel,
+  handleSubmit: state.handleSubmit,
+  handleKeyDown: state.handleKeyDown,
+  handleExportPDF: state.handleExportPDF,
+
+  // Utilities
+  formatDate: state.formatDate,
+  extractUserQuestion: state.extractUserQuestion,
+
+  // Computed Functions
+  getIsButtonDisabled: state.getIsButtonDisabled,
+  getIsLoading: state.getIsLoading,
+});
+
+// Keep other selectors unchanged
 const selectAppState = (state) => ({
   isLoading: state.isLoading,
   error: state.error,
@@ -106,32 +196,6 @@ const selectAppState = (state) => ({
   addNotification: state.addNotification,
   removeNotification: state.removeNotification,
   clearNotifications: state.clearNotifications,
-});
-
-const selectChatState = (state) => ({
-  setInitialized: state.setInitialized,
-  selectedPromptType: state.selectedPromptType,
-  currentMessage: state.currentMessage,
-  chatHistory: state.chatHistory,
-  savedChats: state.savedChats,
-  selectedChatId: state.selectedChatId,
-  hoveredHistoryId: state.hoveredHistoryId,
-  isGenerating: state.isGenerating,
-  isLoadingHistory: state.isLoadingHistory,
-  textareaFocused: state.textareaFocused,
-  generationError: state.generationError,
-  isInitialized: state.isInitialized,
-  // Actions
-  setSelectedPromptType: state.setSelectedPromptType,
-  setCurrentMessage: state.setCurrentMessage,
-  setTextareaFocused: state.setTextareaFocused,
-  setHoveredHistoryId: state.setHoveredHistoryId,
-  clearGenerationError: state.clearGenerationError,
-  clearChatHistory: state.clearChatHistory,
-  loadSavedChat: state.loadSavedChat,
-  loadSavedChats: state.loadSavedChats,
-  generateCompletion: state.generateCompletion,
-  setLoadingHistory: state.setLoadingHistory,
 });
 
 const selectDocumentState = (state) => ({
@@ -155,7 +219,7 @@ const selectDocumentState = (state) => ({
   setSearchResults: state.setSearchResults,
   setSearchError: state.setSearchError,
   clearSearchResults: state.clearSearchResults,
-  // New enhanced actions
+  // Enhanced actions
   searchDocuments: state.searchDocuments,
   resetSearch: state.resetSearch,
   sortDocuments: state.sortDocuments,
@@ -183,28 +247,14 @@ const selectDocumentState = (state) => ({
   title: state.title,
 });
 
-const selectInferenceState = (state) => ({
-  currentPrompt: state.currentPrompt,
-  isGenerating: state.isGenerating,
-  generationError: state.generationError,
-  streamingResponse: state.streamingResponse,
-  // Actions
-  setCurrentPrompt: state.setCurrentPrompt,
-  setGenerating: state.setGenerating,
-  setStreamingResponse: state.setStreamingResponse,
-  setGenerationError: state.setGenerationError,
-  clearGenerationError: state.clearGenerationError,
-  startInference: state.startInference,
-  setSelectedPromptType: state.setSelectedPromptType,
-  selectedPromptType: state.selectedPromptType,
-});
-
 const selectParserState = (state) => ({
   isProcessing: state.isProcessing,
   processingOutput: state.processingOutput,
   lastParserConfig: state.lastParserConfig,
   parserError: state.parserError,
   abortController: state.abortController,
+  loading: state.loading,
+  error: state.error,
   // Actions
   setProcessing: state.setProcessing,
   setProcessingOutput: state.setProcessingOutput,
@@ -213,6 +263,7 @@ const selectParserState = (state) => ({
   setAbortController: state.setAbortController,
   startDocumentParsing: state.startDocumentParsing,
   cancelDocumentParsing: state.cancelDocumentParsing,
+  resetParser: state.resetParser,
 });
 
 const selectSettingsState = (state) => ({
@@ -280,6 +331,7 @@ const selectSettingsState = (state) => ({
   // Reset
   resetSettings: state.resetSettings,
 });
+
 const selectUIState = (state) => ({
   sidebarCollapsed: state.sidebarCollapsed,
   activeTab: state.activeTab,
@@ -292,15 +344,56 @@ const selectUIState = (state) => ({
   closeAllModals: state.closeAllModals,
 });
 
-// Selector hooks using the predefined selector functions
+// ENHANCED: Selector hooks with better error handling
 export const useAppState = () => useStore(useShallow(selectAppState));
 
-export const useChatState = () => useStore(useShallow(selectChatState));
+export const useChatState = () => {
+  const state = useStore(useShallow(selectChatState));
+
+  // Extract specific functions to avoid stale closures
+  const {
+    eventListenersInitialized,
+    initializeEventListeners,
+    cleanupEventListeners,
+  } = state;
+
+  // Initialize event listeners on first use with proper dependencies
+  useEffect(() => {
+    if (!eventListenersInitialized && initializeEventListeners) {
+      initializeEventListeners();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (cleanupEventListeners) {
+        cleanupEventListeners();
+      }
+    };
+  }, [
+    eventListenersInitialized,
+    initializeEventListeners,
+    cleanupEventListeners,
+  ]);
+
+  return state;
+};
+
+// FIXED: Cleanup hook with proper dependencies
+export const useEventCleanup = () => {
+  const cleanupEventListeners = useStore(
+    (state) => state.cleanupEventListeners,
+  );
+
+  useEffect(() => {
+    return () => {
+      if (cleanupEventListeners) {
+        cleanupEventListeners();
+      }
+    };
+  }, []);
+};
 
 export const useDocumentState = () => useStore(useShallow(selectDocumentState));
-
-export const useInferenceState = () =>
-  useStore(useShallow(selectInferenceState));
 
 export const useParserState = () => useStore(useShallow(selectParserState));
 

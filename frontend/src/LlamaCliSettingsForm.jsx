@@ -126,6 +126,24 @@ export const LlamaCliSettingsForm = () => {
 
         initializeModels();
     }, [localInitialized, models.length, Object.keys(llamaCliSettings).length]);
+    const handleCheckboxChange = useCallback(
+        (field, checked) => {
+            // Keep the boolean value as-is for checkboxes
+            updateCliField(field, checked);
+            const tempSettings = { ...llamaCliSettings, [field]: checked };
+            const validation = validateCliSettings(tempSettings);
+            setErrors(validation.errors);
+            // Reset save state when user makes changes
+            if (saveState !== 'idle') {
+                setSaveState('idle');
+                setSaveMessage('');
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
+                }
+            }
+        },
+        [llamaCliSettings, updateCliField, validateCliSettings, saveState]
+    );
 
     // Add this helper function at the top of your component
     const convertToString = (value) => {
@@ -428,7 +446,7 @@ export const LlamaCliSettingsForm = () => {
                                 type="checkbox"
                                 id={fieldId}
                                 checked={!!isChecked}
-                                onChange={(e) => handleChange(fieldId, e.target.checked)}
+                                onChange={(e) => handleCheckboxChange(fieldId, e.target.checked)}
                                 className="theme-form-check"
                             />
                             <Form.Label

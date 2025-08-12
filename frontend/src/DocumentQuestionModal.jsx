@@ -1,6 +1,7 @@
-import { Document, Page, pdf, Text, View } from "@react-pdf/renderer";
+import { pdf } from "@react-pdf/renderer";
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
 import { useCallback, useEffect, useState } from "react";
+import MarkdownPreview from "@uiw/react-markdown-preview";
 
 import { GetDocumentQuestionResponse } from "../wailsjs/go/main/App.js";
 import { LogError } from "../wailsjs/runtime/runtime.js";
@@ -14,9 +15,9 @@ import "../public/main.css";
 
 import PDFDocumentViewer from "./PDFDocumentViewer";
 import { LEGAL_KEYWORDS, DOC_PROMPTS } from "./CommonUtils.jsx";
-import { useInferenceState } from "./StoreConfig.jsx";
 import { PDFReportDocument } from "./CommonUtils.jsx";
 import { PDFExportDocument } from "./CommonUtils.jsx";
+import {useChatState} from "./StoreConfig.jsx";
 
 const DocumentQuestionModal = ({
   show,
@@ -41,7 +42,7 @@ const DocumentQuestionModal = ({
   const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
 
   // Custom hooks
-  const { selectedPromptType } = useInferenceState();
+  const { selectedPromptType } = useChatState();
   const { chatHistory, chatContainerRef, addMessageToChat, clearChatHistory } =
     useChatHistory();
   const {
@@ -102,7 +103,9 @@ const DocumentQuestionModal = ({
   // Load document history when modal opens
   useEffect(() => {
     if (show && docId) {
-      loadDocumentHistory();
+      loadDocumentHistory().catch((error) => {
+        LogError(`Failed to load document history: ${error}`);
+      });
     }
   }, [show, docId, loadDocumentHistory]);
 
@@ -362,55 +365,6 @@ const DocumentQuestionModal = ({
       </div>
     );
   };
-  const formatMessageText = useCallback((text) => {
-    if (!text) return "";
-
-    if (text.includes("```")) {
-      const parts = text.split(/(```[\s\S]*?```)/g);
-      return (
-        <>
-          {parts.map((part, i) => {
-            if (part.startsWith("```") && part.endsWith("```")) {
-              const code = part.slice(3, -3);
-              const firstLineBreak = code.indexOf("\n");
-              const language =
-                firstLineBreak > 0 ? code.slice(0, firstLineBreak).trim() : "";
-              const codeContent =
-                firstLineBreak > 0 ? code.slice(firstLineBreak + 1) : code;
-
-              return (
-                <div key={i} className="code-block">
-                  {language && (
-                    <div
-                      className="text-primary mb-2"
-                      style={{ fontSize: "0.8rem", fontWeight: "700" }}
-                    >
-                      {language}
-                    </div>
-                  )}
-                  <pre className="bg-secondary p-2 rounded text-light">
-                    {codeContent}
-                  </pre>
-                </div>
-              );
-            } else {
-              return part.split("\n\n").map((paragraph, j) => (
-                <p key={`${i}-${j}`} className="p-1">
-                  {paragraph}
-                </p>
-              ));
-            }
-          })}
-        </>
-      );
-    }
-
-    return text.split("\n\n").map((paragraph, i) => (
-      <p key={i} className="mb-3">
-        {paragraph}
-      </p>
-    ));
-  }, []);
 
   const handleSelectHistoryItem = useCallback((historyItem) => {
     setSelectedHistoryId(historyItem._id?.$oid || historyItem._id);
@@ -728,7 +682,7 @@ const DocumentQuestionModal = ({
                   whiteSpace: "pre-wrap",
                 }}
               >
-                {selectedHistoryItem.response || "No document query"}
+                <MarkdownPreview source={selectedHistoryItem.response} />
               </pre>
             </div>
           </div>
@@ -878,7 +832,7 @@ const DocumentQuestionModal = ({
                                 </div>
                               ) : (
                                 <div style={{ whiteSpace: "pre-wrap" }}>
-                                  {formatMessageText(message.content)}
+                                  <MarkdownPreview source={message.content} />
                                 </div>
                               )}
                               {message.processTime && (

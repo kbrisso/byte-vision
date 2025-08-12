@@ -14,12 +14,11 @@
     "test:e2e:debug": "wdio run wdio.conf.js --debug",
     "test:e2e:report": "allure generate allure-results --clean && allure open",
     "test:e2e:clean": "NODE_NO_WARNINGS=1 wdio run wdio.conf.js --logLevel silent"
-
-
   },
   "dependencies": {
     "@eslint/js": "^9.18.0",
     "@react-pdf/renderer": "^4.3.0",
+    "@uiw/react-markdown-preview": "^5.1.5",
     "bootstrap": "^5.3.3",
     "bootstrap-icons": "^1.11.3",
     "bootstrap-input-spinner": "^4.0.4",
