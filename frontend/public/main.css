@@ -191,6 +191,35 @@ body {
     background-color: var(--bs-primary) !important; /* Change to desired hover color */
     color: var(--bs-white) !important; /* Adjust text color for contrast if needed */
 }
+.card.history-item:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Only show selection state, not hover state */
+.card.history-item:not(.selected):hover {
+    border-color: var(--border-secondary) !important;
+    background-color: var(--bg-card) !important;
+}
+.chat-history-item {
+    transition: background-color 0.2s ease-in-out;
+}
+
+.chat-history-item:hover {
+    background-color: var(--bg-tertiary) !important;
+}
+
+.chat-history-item:active {
+    background-color: var(--bg-quaternary) !important;
+}
+
+.chat-history-item.active {
+    background-color: var(--bg-secondary) !important;
+}
+
+.chat-history-item.active:hover {
+    background-color: var(--bg-tertiary) !important;
+}
 
 /* Ensure the modal takes up most of the screen */
 @media (min-width: 1400px) {

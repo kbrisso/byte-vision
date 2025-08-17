@@ -213,7 +213,6 @@ const DocumentSearchForm = () => {
     isSearching,
     searchError,
     searchFilters,
-    abortController,
     isQAOpen,
     isViewOpen,
     docId,

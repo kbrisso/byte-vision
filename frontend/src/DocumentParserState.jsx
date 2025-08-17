@@ -2,7 +2,7 @@ import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
 import {  CancelProcess } from "../wailsjs/go/main/App.js";
 import { EventsEmit, EventsOff, EventsOn } from "../wailsjs/runtime/runtime.js";
 
-export const createParserSlice = (set, get) => ({
+export const createParserState = (set, get) => ({
   // Parser state
   isProcessing: false,
   processingOutput: "",

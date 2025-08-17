@@ -1,4 +1,4 @@
-export const createDocumentSlice = (set) => ({
+export const createDocumentState = (set) => ({
   // Document state
   documents: [],
   title: "",

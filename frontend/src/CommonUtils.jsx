@@ -1,4 +1,4 @@
-import { Document, Page, Text, View } from "@react-pdf/renderer";
+
 /**
  * Prompt types for different AI models
  */
@@ -10,6 +10,7 @@ export const PROMPT_TYPES = [
   "SystemUserAssistant",
   "UserAssistantDeepSeek",
   "FeeForm",
+   "Gemma",
 ];
 
 /**
@@ -226,7 +227,14 @@ export const DOC_PROMPTS = {
     "Analyze the document for issues related to the separation of executive, legislative, and judicial powers.",
 };
 
-// PDF Report Component for Document Analysis
+/**
+ * Chat Controller Hook - Provides a unified interface for chat operations
+ * This hook manages chat state, settings, and provides functions for message handling
+ *
+ * @param {string} scope - The scope identifier for this chat instance (default: "default")
+ * @returns {Object} Chat controller object with methods and state
+ */
+
 export const PDFReportDocument = ({ reportData }) => (
   <Document>
     <Page

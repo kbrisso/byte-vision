@@ -8,7 +8,7 @@ import {
   SaveEmbedSettings,
 } from "../wailsjs/go/main/App.js";
 
-export const createSettingsSlice = (set, get) => ({
+export const createSettingsState = (set, get) => ({
   // Settings state
   settings: {
     llamaCli: {},

@@ -1,23 +1,8 @@
-import { pdf } from "@react-pdf/renderer";
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
-import { useCallback, useEffect, useState } from "react";
 import MarkdownPreview from "@uiw/react-markdown-preview";
-
-import { GetDocumentQuestionResponse } from "../wailsjs/go/main/App.js";
-import { LogError } from "../wailsjs/runtime/runtime.js";
-
-import { useChatHistory } from "./ChatHistoryManager.jsx";
-import { useDocumentQuery } from "./DocumentQueryHook.jsx";
-// eslint-disable-next-line import/order
-import { useKeywordSelection } from "./KeywordSelectionHook.jsx";
-
 import "../public/main.css";
-
 import PDFDocumentViewer from "./PDFDocumentViewer";
-import { LEGAL_KEYWORDS, DOC_PROMPTS } from "./CommonUtils.jsx";
-import { PDFReportDocument } from "./CommonUtils.jsx";
-import { PDFExportDocument } from "./CommonUtils.jsx";
-import {useChatState} from "./StoreConfig.jsx";
+import { useDocumentQuestionState } from "./DocumentQuestionState.jsx";
 
 const DocumentQuestionModal = ({
   show,
@@ -29,249 +14,16 @@ const DocumentQuestionModal = ({
   sourceLocation,
   title,
 }) => {
-  // State management
-  const [question, setQuestion] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [selectedDocPrompt, setSelectedDocPrompt] = useState("");
-  const [embeddingPrompt, setEmbeddingPrompt] = useState("");
-  const [documentHistory, setDocumentHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [leftActiveTab, setLeftActiveTab] = useState("history");
-  const [exportingPDF, setExportingPDF] = useState(false);
-  const [selectedHistoryId, setSelectedHistoryId] = useState(null);
-  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+  // Use the dedicated document question state hook
+  const doc = useDocumentQuestionState({
+    show,
+    docId,
+    indexValue,
+    sourceLocation,
+    cliState,
+    embState,
+  });
 
-  // Custom hooks
-  const { selectedPromptType } = useChatState();
-  const { chatHistory, chatContainerRef, addMessageToChat, clearChatHistory } =
-    useChatHistory();
-  const {
-    selectedKeywords,
-    clearKeywords,
-    keywordDropdownOpen,
-    setKeywordDropdownOpen,
-    hoveredOption,
-    setHoveredOption,
-    multiSelectRef,
-    handleKeywordToggle,
-    handleRemoveKeyword,
-  } = useKeywordSelection();
-
-  const loadDocumentHistory = useCallback(async () => {
-    if (!docId) return;
-
-    try {
-      setHistoryLoading(true);
-      const response = await GetDocumentQuestionResponse(docId);
-      const historyData = Array.isArray(JSON.parse(response))
-        ? JSON.parse(response)
-        : [];
-      setDocumentHistory(historyData);
-    } catch (error) {
-      LogError(`Failed to load document history: ${error}`);
-      setDocumentHistory([]);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, [docId]);
-
-  const { progressMessage, isProcessing, submitQuery, handleCancel } =
-    useDocumentQuery({
-      addMessageToChat,
-      loadDocumentHistory,
-    });
-
-  // Reset state when modal opens/closes
-  useEffect(() => {
-    if (!show) {
-      clearChatHistory();
-      clearKeywords();
-      setQuestion("");
-      setSelectedDocPrompt("");
-      setEmbeddingPrompt("");
-      setDocumentHistory([]);
-      setLoading(false);
-    }
-  }, [show, clearChatHistory, clearKeywords]);
-
-  // Update embedding prompt when doc prompt changes
-  useEffect(() => {
-    const promptTemplate = selectedDocPrompt && DOC_PROMPTS[selectedDocPrompt];
-    setEmbeddingPrompt(promptTemplate || "");
-  }, [selectedDocPrompt]);
-
-  // Load document history when modal opens
-  useEffect(() => {
-    if (show && docId) {
-      loadDocumentHistory().catch((error) => {
-        LogError(`Failed to load document history: ${error}`);
-      });
-    }
-  }, [show, docId, loadDocumentHistory]);
-
-  const handleSubmit = useCallback(
-    async (e) => {
-      e.preventDefault();
-      if (!question.trim() || loading || isProcessing) return;
-
-      // Validation - do this BEFORE adding message to chat
-      if (!selectedDocPrompt) {
-        LogError("Please select a prompt type");
-        return;
-      }
-      if (!embeddingPrompt.trim()) {
-        LogError("Embedding prompt is required");
-        return;
-      }
-
-      try {
-        // Add a user message only after validation passes
-        addMessageToChat("user", question);
-
-        // Submit query
-        await submitQuery({
-          llamaCliArgs: cliState,
-          llamaEmbedArgs: embState,
-          indexId: indexValue,
-          documentId: docId,
-          embeddingPrompt: embeddingPrompt.trim(),
-          documentPrompt: question.trim(),
-          promptType: selectedPromptType,
-          searchKeywords: selectedKeywords,
-        });
-
-        // Clear question only on successful submission
-        setQuestion("");
-      } catch (error) {
-        // Handle submission error - you might want to remove the user message
-        // or add an error message to chat here
-        LogError(`Query submission failed: ${error.message}`);
-      }
-    },
-    [
-      question,
-      loading,
-      isProcessing,
-      selectedDocPrompt,
-      embeddingPrompt,
-      addMessageToChat,
-      submitQuery,
-      cliState,
-      embState,
-      indexValue,
-      docId,
-      selectedPromptType,
-      selectedKeywords,
-    ],
-  );
-  const formatDate = (dateValue) => {
-    if (!dateValue) return "Unknown Date";
-    try {
-      const date = new Date(dateValue);
-      return date.toLocaleDateString();
-    } catch (error) {
-      LogError(`Failed to format date: ${error}`);
-      return "Invalid Date";
-    }
-  };
-
-  // Reset state when modal opens/closes
-  useEffect(() => {
-    if (!show) {
-      clearChatHistory();
-      clearKeywords();
-      setQuestion("");
-      setSelectedDocPrompt("");
-      setEmbeddingPrompt("");
-      setDocumentHistory([]);
-      setLoading(false);
-      setLeftActiveTab("history"); // Reset tab
-      setSelectedHistoryId(null);
-      setSelectedHistoryItem(null);
-      setExportingPDF(false);
-    }
-  }, [show, clearChatHistory, clearKeywords]);
-
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (e.key === "Enter" && !e.shiftKey && !loading && question.trim()) {
-        e.preventDefault();
-        handleSubmit(e);
-      }
-    },
-    [loading, question, handleSubmit],
-  );
-
-  const handleExportPDF = async () => {
-    if (!chatHistory.length || exportingPDF) return;
-
-    try {
-      setExportingPDF(true);
-
-      const documentTitle = sourceLocation
-        ? sourceLocation.split("/").pop() || sourceLocation.split("\\").pop()
-        : "Unknown Document";
-
-      const pdfBlob = await pdf(
-        <PDFExportDocument
-          chatHistory={chatHistory}
-          documentTitle={documentTitle}
-        />,
-      ).toBlob();
-
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `chat-session-${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      LogError(`PDF export failed: ${error}`);
-    } finally {
-      setExportingPDF(false);
-    }
-  };
-
-  // Function to handle an exporting detailed history report
-  const handleExportHistoryReport = async () => {
-    if (!selectedHistoryItem || exportingPDF) return;
-
-    try {
-      setExportingPDF(true);
-
-      const reportData = {
-        documentId: docId,
-        indexName: indexValue,
-        promptType: selectedHistoryItem.promptType,
-        processTime: selectedHistoryItem.processTime,
-        createdAt: selectedHistoryItem.createdAt,
-        embedPrompt: selectedHistoryItem.embedPrompt,
-        docPrompt: selectedHistoryItem.docPrompt,
-        keywords: selectedHistoryItem.keywords,
-        response: selectedHistoryItem.response,
-        id: selectedHistoryItem._id?.$oid || selectedHistoryItem._id,
-      };
-
-      const pdfBlob = await pdf(
-        <PDFReportDocument reportData={reportData} />,
-      ).toBlob();
-
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `legal-analysis-report-${new Date().toISOString().slice(0, 10)}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      LogError(`PDF report export failed: ${error}`);
-    } finally {
-      setExportingPDF(false);
-    }
-  };
   // Progress Message Container Component
   const ProgressMessageContainer = ({ progressMessage, onCancel }) => {
     if (!progressMessage) return null;
@@ -366,106 +118,45 @@ const DocumentQuestionModal = ({
     );
   };
 
-  const handleSelectHistoryItem = useCallback((historyItem) => {
-    setSelectedHistoryId(historyItem._id?.$oid || historyItem._id);
-    setSelectedHistoryItem(historyItem);
-  }, []);
+    const HistoryItem = ({ item, index, selectedHistoryId, onSelectHistoryItem, formatDate }) => {
+        const isSelected = selectedHistoryId === (item._id?.$oid || item._id);
 
-  const renderMultiSelect = () => {
-    return (
-      <div className="position-relative" ref={multiSelectRef}>
-        <div
-          className="form-control d-flex flex-wrap align-items-center"
-          onClick={() => setKeywordDropdownOpen(!keywordDropdownOpen)}
-          style={{
-            cursor: "pointer",
-            minHeight: "32px",
-            fontSize: "0.85rem",
-            backgroundColor: "var(--bg-input)",
-            borderColor: "var(--border-secondary)",
-            color: "var(--text-primary)",
-          }}
-        >
-          {selectedKeywords.length > 0 ? (
-            selectedKeywords.map((keyword) => (
-              <span
-                key={keyword}
-                className="badge bg-primary me-1 mb-1 d-flex align-items-center"
-                style={{ fontSize: "0.7rem" }}
-              >
-                {keyword}
-                <button
-                  type="button"
-                  className="btn-close btn-close-white ms-1"
-                  aria-label="Remove"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveKeyword(keyword);
-                  }}
-                  style={{ fontSize: "0.5rem" }}
-                />
-              </span>
-            ))
-          ) : (
-            <span className="text-muted" style={{ fontSize: "0.85rem" }}>
-              Select embedding keywords related to document subject.
-            </span>
-          )}
-          <i
-            className={`bi bi-chevron-${keywordDropdownOpen ? "up" : "down"} ms-auto`}
-            style={{ fontSize: "0.8rem" }}
-          ></i>
-        </div>
-
-        {keywordDropdownOpen && (
-          <div
-            className="position-absolute w-100 mt-1 border rounded shadow-lg"
-            style={{
-              backgroundColor: "var(--bg-card)",
-              borderColor: "var(--border-secondary)",
-              zIndex: 1000,
-              maxHeight: "150px",
-              overflowY: "auto",
-              fontSize: "0.85rem",
-            }}
-          >
-            {LEGAL_KEYWORDS.map((keyword) => (
-              <div
-                key={keyword}
-                className="p-2 border-bottom"
+        return (
+            <div
+                key={item._id?.$oid || item._id || index}
+                className={`border rounded p-2 mb-2 cursor-pointer chat-history-item ${
+                    isSelected ? "border-primary bg-primary bg-opacity-10 active" : "border-secondary"
+                }`}
                 style={{
-                  cursor: "pointer",
-                  backgroundColor:
-                    hoveredOption === keyword
-                      ? "var(--bg-secondary)"
-                      : "transparent",
-                  borderColor: "var(--border-tertiary)",
-                  color: "var(--text-primary)",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease-in-out",
                 }}
-                onMouseEnter={() => setHoveredOption(keyword)}
-                onMouseLeave={() => setHoveredOption(null)}
-                onClick={() => handleKeywordToggle(keyword)}
-              >
-                <div className="d-flex align-items-center">
-                  <input
-                    type="checkbox"
-                    className="form-check-input me-2"
-                    checked={selectedKeywords.includes(keyword)}
-                    onChange={() => {}}
-                    style={{ transform: "scale(0.9)" }}
-                  />
-                  <span style={{ fontSize: "0.85rem" }}>{keyword}</span>
+                onClick={() => onSelectHistoryItem(item)}
+            >
+                <div className="d-flex justify-content-between align-items-start">
+                    <div className="flex-grow-1">
+                        <h6 className="mb-1" style={{ fontSize: "0.9rem" }}>
+                            {item.promptType || "Unknown Type"}
+                        </h6>
+                        <p className="mb-1 text-muted" style={{ fontSize: "0.8rem" }}>
+                            {item.docPrompt ? item.docPrompt.substring(0, 80) + "..." : "No query"}
+                        </p>
+                        <small className="text-muted">{formatDate(item.createdAt)}</small>
+                    </div>
+                    <div className="flex-shrink-0 ms-2">
+                        {item.processTime && (
+                            <span className="badge bg-secondary" style={{ fontSize: "0.7rem" }}>
+              {(item.processTime / 1000).toFixed(1)}s
+            </span>
+                        )}
+                    </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
+            </div>
+        );
+    };
 
   const renderHistoryList = () => {
-    if (historyLoading) {
+    if (doc.historyLoading) {
       return (
         <div
           className="d-flex justify-content-center align-items-center"
@@ -479,7 +170,7 @@ const DocumentQuestionModal = ({
       );
     }
 
-    if (!Array.isArray(documentHistory) || documentHistory.length === 0) {
+    if (!Array.isArray(doc.documentHistory) || doc.documentHistory.length === 0) {
       return (
         <div
           className="text-center d-flex flex-column justify-content-center align-items-center"
@@ -499,59 +190,22 @@ const DocumentQuestionModal = ({
 
     return (
       <div>
-        {documentHistory.map((item, index) => (
-          <div
+        {doc.documentHistory.map((item, index) => (
+          <HistoryItem
             key={item._id?.$oid || item._id || index}
-            className={`card mb-2 ${selectedHistoryId === (item._id?.$oid || item._id) ? "border-primary" : ""}`}
-            style={{
-              cursor: "pointer",
-              backgroundColor:
-                selectedHistoryId === (item._id?.$oid || item._id)
-                  ? "var(--bg-secondary)"
-                  : "var(--bg-card)",
-              borderColor:
-                selectedHistoryId === (item._id?.$oid || item._id)
-                  ? "var(--border-focus)"
-                  : "var(--border-secondary)",
-            }}
-            onClick={() => handleSelectHistoryItem(item)}
-          >
-            <div className="card-body p-3 history-hover-div">
-              <div className="d-flex justify-content-between align-items-start mb-2">
-                <h6
-                  className="card-title mb-0 focus-ring"
-                  style={{ fontSize: "0.9rem" }}
-                >
-                  {item.promptType || "Unknown Type"}
-                </h6>
-                <small className="text-muted">
-                  {formatDate(item.createdAt)}
-                </small>
-              </div>
-              <p className="card-text mb-2" style={{ fontSize: "0.85rem" }}>
-                <strong>Q:</strong> {item.docPrompt?.slice(0, 100)}...
-              </p>
-              <div className="d-flex justify-content-between align-items-center">
-                <small className="text-muted">
-                  {item.keywords?.length > 0
-                    ? `${item.keywords.length} keywords`
-                    : "No keywords"}
-                </small>
-                <small className="text-muted">
-                  {item.processTime
-                    ? `${(item.processTime / 1000).toFixed(1)}s`
-                    : "Unknown time"}
-                </small>
-              </div>
-            </div>
-          </div>
+            item={item}
+            index={index}
+            selectedHistoryId={doc.selectedHistoryId}
+            onSelectHistoryItem={doc.handleSelectHistoryItem}
+            formatDate={doc.formatDate}
+          />
         ))}
       </div>
     );
   };
 
   const renderSelectedHistory = () => {
-    if (!selectedHistoryItem) {
+    if (!doc.selectedHistoryItem) {
       return (
         <div className="text-center d-flex flex-column justify-content-center align-items-center h-100">
           <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>📝</div>
@@ -570,10 +224,10 @@ const DocumentQuestionModal = ({
           <Button
             variant="outline-success"
             size="sm"
-            onClick={handleExportHistoryReport}
-            disabled={exportingPDF}
+            onClick={doc.handleExportHistoryReport}
+            disabled={doc.exportingPDF}
           >
-            {exportingPDF ? (
+            {doc.exportingPDF ? (
               <>
                 <Spinner animation="border" size="sm" className="me-1" />
                 Exporting...
@@ -587,10 +241,7 @@ const DocumentQuestionModal = ({
           </Button>
         </div>
 
-        <div
-          className="flex-grow-1 p-3 theme-scrollbar"
-          style={{ overflowY: "auto" }}
-        >
+        <div className="flex-grow-1 p-3 theme-scrollbar" style={{ overflowY: "auto" }}>
           <div className="card mb-3">
             <div className="card-header">
               <h6 className="mb-0">Analysis Summary</h6>
@@ -599,15 +250,13 @@ const DocumentQuestionModal = ({
               <div className="row">
                 <div className="col-md-6">
                   <strong>Prompt Type:</strong>
-                  <p className="text-muted">
-                    {selectedHistoryItem.promptType || "Unknown"}
-                  </p>
+                  <p className="text-muted">{doc.selectedHistoryItem.promptType || "Unknown"}</p>
                 </div>
                 <div className="col-md-6">
                   <strong>Processing Time:</strong>
                   <p className="text-muted">
-                    {selectedHistoryItem.processTime
-                      ? `${(selectedHistoryItem.processTime / 1000).toFixed(2)}s`
+                    {doc.selectedHistoryItem.processTime
+                      ? `${(doc.selectedHistoryItem.processTime / 1000).toFixed(2)}s`
                       : "Unknown"}
                   </p>
                 </div>
@@ -615,29 +264,23 @@ const DocumentQuestionModal = ({
               <div className="row">
                 <div className="col-12">
                   <strong>Created:</strong>
-                  <p className="text-muted">
-                    {formatDate(selectedHistoryItem.createdAt)}
-                  </p>
+                  <p className="text-muted">{doc.formatDate(doc.selectedHistoryItem.createdAt)}</p>
                 </div>
               </div>
-              {selectedHistoryItem.keywords &&
-                selectedHistoryItem.keywords.length > 0 && (
-                  <div className="row">
-                    <div className="col-12">
-                      <strong>Keywords:</strong>
-                      <div className="mt-1">
-                        {selectedHistoryItem.keywords.map((keyword, index) => (
-                          <span
-                            key={index}
-                            className="badge bg-primary me-1 mb-1"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
+              {doc.selectedHistoryItem.keywords && doc.selectedHistoryItem.keywords.length > 0 && (
+                <div className="row">
+                  <div className="col-12">
+                    <strong>Keywords:</strong>
+                    <div className="mt-1">
+                      {doc.selectedHistoryItem.keywords.map((keyword, index) => (
+                        <span key={index} className="badge bg-primary me-1 mb-1">
+                          {keyword}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -650,7 +293,7 @@ const DocumentQuestionModal = ({
                 className="bg-secondary p-3 rounded text-light"
                 style={{ fontSize: "0.8rem", whiteSpace: "pre-wrap" }}
               >
-                {selectedHistoryItem.embedPrompt || "No embedding prompt"}
+                {doc.selectedHistoryItem.embedPrompt || "No embedding prompt"}
               </pre>
             </div>
           </div>
@@ -664,7 +307,7 @@ const DocumentQuestionModal = ({
                 className="bg-secondary p-3 rounded text-light"
                 style={{ fontSize: "0.8rem", whiteSpace: "pre-wrap" }}
               >
-                {selectedHistoryItem.docPrompt || "No document query"}
+                {doc.selectedHistoryItem.docPrompt || "No document query"}
               </pre>
             </div>
           </div>
@@ -682,7 +325,7 @@ const DocumentQuestionModal = ({
                   whiteSpace: "pre-wrap",
                 }}
               >
-                <MarkdownPreview source={selectedHistoryItem.response} />
+                <MarkdownPreview source={doc.selectedHistoryItem.response} />
               </pre>
             </div>
           </div>
@@ -708,17 +351,11 @@ const DocumentQuestionModal = ({
         <div className="modal-header">
           <div className="p-2 flex-grow-1">
             <h5 className="modal-title">
-              Document Q&A{" "}
-              <span className="badge text-bg-secondary">{title}</span>
+              Document Q&A <span className="badge text-bg-secondary">{title}</span>
             </h5>
           </div>
           <div className="p-2">
-            <Button
-              onClick={handleClose}
-              variant="primary"
-              size="sm"
-              style={{ fontSize: "0.8rem" }}
-            >
+            <Button onClick={handleClose} variant="primary" size="sm" style={{ fontSize: "0.8rem" }}>
               Close
             </Button>
           </div>
@@ -738,16 +375,20 @@ const DocumentQuestionModal = ({
                 <div className="btn-group w-100" role="group">
                   <button
                     type="button"
-                    className={`btn btn-sm ${leftActiveTab === "history" ? "btn-primary" : "btn-outline-secondary"}`}
-                    onClick={() => setLeftActiveTab("history")}
+                    className={`btn btn-sm ${
+                      doc.leftActiveTab === "history" ? "btn-primary" : "btn-outline-secondary"
+                    }`}
+                    onClick={() => doc.setLeftActiveTab("history")}
                   >
                     <i className="bi bi-clock-history me-1"></i>
                     History
                   </button>
                   <button
                     type="button"
-                    className={`btn btn-sm ${leftActiveTab === "chat" ? "btn-primary" : "btn-outline-secondary"}`}
-                    onClick={() => setLeftActiveTab("chat")}
+                    className={`btn btn-sm ${
+                      doc.leftActiveTab === "chat" ? "btn-primary" : "btn-outline-secondary"
+                    }`}
+                    onClick={() => doc.setLeftActiveTab("chat")}
                   >
                     <i className="bi bi-chat-dots me-1"></i>
                     Chat
@@ -756,18 +397,15 @@ const DocumentQuestionModal = ({
               </div>
 
               {/* Tab Content */}
-              <div
-                className="flex-grow-1 d-flex flex-column theme-scrollbar"
-                style={{ overflowY: "auto" }}
-              >
-                {leftActiveTab === "history" ? (
+              <div className="flex-grow-1 d-flex flex-column theme-scrollbar" style={{ overflowY: "auto" }}>
+                {doc.leftActiveTab === "history" ? (
                   <div className="flex-grow-1 p-2">{renderHistoryList()}</div>
                 ) : (
                   <div className="d-flex flex-column h-100">
                     {/* Chat Messages - Reduced Height */}
                     <div
                       className="flex-grow-1 p-2 theme-scrollbar"
-                      ref={chatContainerRef}
+                      ref={doc.chatContainerRef}
                       style={{
                         overflowY: "auto",
                         backgroundColor: "var(--bg-tertiary)",
@@ -775,59 +413,38 @@ const DocumentQuestionModal = ({
                         maxHeight: "50vh",
                       }}
                     >
-                      {chatHistory.length === 0 ? (
-                        <div
-                          className="text-center"
-                          style={{ color: "var(--text-quaternary)" }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "1.5rem",
-                              marginBottom: "0.5rem",
-                            }}
-                          >
-                            💬
-                          </div>
+                      {doc.chatHistory.length === 0 ? (
+                        <div className="text-center" style={{ color: "var(--text-quaternary)" }}>
+                          <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>💬</div>
                           <p className="mb-0" style={{ fontSize: "0.9rem" }}>
                             Start a conversation about this document
                           </p>
                         </div>
                       ) : (
-                        chatHistory.map((message, index) => (
+                        doc.chatHistory.map((message, index) => (
                           <div
                             key={message.id || index}
                             className={`mb-2 ${message.sender === "user" ? "text-end" : "text-start"}`}
                           >
                             <div
                               className={`d-inline-block p-2 rounded ${
-                                message.sender === "user"
-                                  ? "bg-primary text-white"
-                                  : "bg-light text-dark"
+                                message.sender === "user" ? "bg-primary text-white" : "bg-light text-dark"
                               }`}
                               style={{
                                 maxWidth: "85%",
                                 fontSize: "0.9rem",
                                 backgroundColor:
-                                  message.sender === "user"
-                                    ? "var(--btn-primary-bg)"
-                                    : "var(--bg-card)",
+                                  message.sender === "user" ? "var(--btn-primary-bg)" : "var(--bg-card)",
                                 color:
-                                  message.sender === "user"
-                                    ? "var(--btn-primary-text)"
-                                    : "var(--text-primary)",
+                                  message.sender === "user" ? "var(--btn-primary-text)" : "var(--text-primary)",
                                 borderColor: "var(--border-secondary)",
                               }}
                             >
                               {message.isLoading ? (
-                                <div
-                                  className="progress mt-2"
-                                  style={{ height: "4px" }}
-                                >
+                                <div className="progress mt-2" style={{ height: "4px" }}>
                                   <div
                                     className="progress-bar progress-bar-striped progress-bar-animated"
-                                    style={{
-                                      width: `${message.progress || 0}%`,
-                                    }}
+                                    style={{ width: `${message.progress || 0}%` }}
                                   />
                                 </div>
                               ) : (
@@ -851,28 +468,22 @@ const DocumentQuestionModal = ({
                       className="p-2 border-top flex-shrink-0"
                       style={{ borderColor: "var(--border-secondary)" }}
                     >
-                      <Form onSubmit={handleSubmit}>
+                      <Form onSubmit={doc.handleSubmit}>
                         <div className="row g-2 mb-2">
                           <div className="col-6">
-                            <Form.Label
-                              className="mb-1"
-                              style={{ fontSize: "0.8rem" }}
-                              column={"lg"}
-                            >
+                            <Form.Label className="mb-1" style={{ fontSize: "0.8rem" }} column={"lg"}>
                               Embedding prompt types:
                             </Form.Label>
                             <Form.Select
                               className="theme-form-control form-select"
-                              value={selectedDocPrompt}
-                              onChange={(e) =>
-                                setSelectedDocPrompt(e.target.value)
-                              }
+                              value={doc.selectedDocPrompt}
+                              onChange={(e) => doc.setSelectedDocPrompt(e.target.value)}
                               required
                               size="sm"
                               style={{ fontSize: "0.85rem" }}
                             >
                               <option value="">Select a prompt</option>
-                              {Object.keys(DOC_PROMPTS).map((type) => (
+                              {Object.keys(doc.DOC_PROMPTS).map((type) => (
                                 <option key={type} value={type}>
                                   {type}
                                 </option>
@@ -880,33 +491,23 @@ const DocumentQuestionModal = ({
                             </Form.Select>
                           </div>
                           <div className="col-6">
-                            <Form.Label
-                              className="mb-1"
-                              style={{ fontSize: "0.8rem" }}
-                              column={"lg"}
-                            >
+                            <Form.Label className="mb-1" style={{ fontSize: "0.8rem" }} column={"lg"}>
                               Embedding keywords
                             </Form.Label>
-                            <div style={{ fontSize: "0.85rem" }}>
-                              {renderMultiSelect()}
-                            </div>
+                            <div style={{ fontSize: "0.85rem" }}>{doc.renderMultiSelect()}</div>
                           </div>
                         </div>
 
                         <div className="mb-2">
-                          <Form.Label
-                            className="mb-1"
-                            style={{ fontSize: "0.8rem" }}
-                            column={"lg"}
-                          >
+                          <Form.Label className="mb-1" style={{ fontSize: "0.8rem" }} column={"lg"}>
                             Embedding prompt text:
                           </Form.Label>
                           <Form.Control
                             as="textarea"
                             rows={1}
                             id="embeddingPrompt"
-                            value={embeddingPrompt}
-                            onChange={(e) => setEmbeddingPrompt(e.target.value)}
+                            value={doc.embeddingPrompt}
+                            onChange={(e) => doc.setEmbeddingPrompt(e.target.value)}
                             placeholder="Choose an embedding prompt type..."
                             required
                             size="sm"
@@ -915,20 +516,16 @@ const DocumentQuestionModal = ({
                         </div>
 
                         <div className="mb-2">
-                          <Form.Label
-                            className="mb-1"
-                            style={{ fontSize: "0.8rem" }}
-                            column={"lg"}
-                          >
+                          <Form.Label className="mb-1" style={{ fontSize: "0.8rem" }} column={"lg"}>
                             Ask a question
                           </Form.Label>
                           <Form.Control
                             as="textarea"
                             id="question-input"
                             rows={2}
-                            value={question}
-                            onChange={(e) => setQuestion(e.target.value)}
-                            onKeyDown={handleKeyDown}
+                            value={doc.question}
+                            onChange={(e) => doc.setQuestion(e.target.value)}
+                            onKeyDown={doc.handleKeyDown}
                             placeholder="Ask a question about this document..."
                             required
                             size="sm"
@@ -941,8 +538,8 @@ const DocumentQuestionModal = ({
                             <Button
                               type="button"
                               variant="outline-secondary"
-                              onClick={clearChatHistory}
-                              disabled={chatHistory.length === 0}
+                              onClick={doc.clearChatHistory}
+                              disabled={doc.chatHistory.length === 0}
                               className="me-2"
                               size="sm"
                               style={{ fontSize: "0.8rem" }}
@@ -953,20 +550,14 @@ const DocumentQuestionModal = ({
                             <Button
                               type="button"
                               variant="outline-info"
-                              onClick={handleExportPDF}
-                              disabled={
-                                chatHistory.length === 0 || exportingPDF
-                              }
+                              onClick={doc.handleExportPDF}
+                              disabled={doc.chatHistory.length === 0 || doc.exportingPDF}
                               size="sm"
                               style={{ fontSize: "0.8rem" }}
                             >
-                              {exportingPDF ? (
+                              {doc.exportingPDF ? (
                                 <>
-                                  <Spinner
-                                    animation="border"
-                                    size="sm"
-                                    className="me-1"
-                                  />
+                                  <Spinner animation="border" size="sm" className="me-1" />
                                   Export...
                                 </>
                               ) : (
@@ -978,11 +569,11 @@ const DocumentQuestionModal = ({
                             </Button>
                           </div>
                           <div>
-                            {isProcessing && (
+                            {doc.isProcessing && (
                               <Button
                                 type="button"
                                 variant="outline-warning"
-                                onClick={handleCancel}
+                                onClick={doc.handleCancel}
                                 className="me-2"
                                 size="sm"
                                 style={{ fontSize: "0.8rem" }}
@@ -994,22 +585,13 @@ const DocumentQuestionModal = ({
                             <Button
                               type="submit"
                               variant="primary"
-                              disabled={
-                                !question.trim() ||
-                                loading ||
-                                !selectedDocPrompt ||
-                                !embeddingPrompt.trim()
-                              }
+                              disabled={doc.isSubmitDisabled()}
                               size="sm"
                               style={{ fontSize: "0.8rem" }}
                             >
-                              {loading ? (
+                              {doc.loading ? (
                                 <>
-                                  <Spinner
-                                    animation="border"
-                                    size="sm"
-                                    className="me-1"
-                                  />
+                                  <Spinner animation="border" size="sm" className="me-1" />
                                   Processing...
                                 </>
                               ) : (
@@ -1030,17 +612,11 @@ const DocumentQuestionModal = ({
 
             {/* Right Panel - History Details or Document Viewer */}
             <div className="w-50 d-flex flex-column">
-              {leftActiveTab === "history" ? (
-                <div className="h-100 d-flex flex-column">
-                  {renderSelectedHistory()}
-                </div>
+              {doc.leftActiveTab === "history" ? (
+                <div className="h-100 d-flex flex-column">{renderSelectedHistory()}</div>
               ) : (
                 <div className="h-100 d-flex align-items-center justify-content-center">
-                  <PDFDocumentViewer
-                    sourceLocation={sourceLocation}
-                    show={true}
-                    onClose={() => {}}
-                  />
+                  <PDFDocumentViewer sourceLocation={sourceLocation} show={true} onClose={() => {}} />
                 </div>
               )}
             </div>
@@ -1048,11 +624,8 @@ const DocumentQuestionModal = ({
         </Modal.Body>
       </Modal>
       {/* Progress Overlay - rendered conditionally when progressMessage exists */}
-      {isProcessing && progressMessage && (
-        <ProgressMessageContainer
-          progressMessage={progressMessage}
-          onCancel={handleCancel}
-        />
+      {doc.isProcessing && doc.progressMessage && (
+        <ProgressMessageContainer progressMessage={doc.progressMessage} onCancel={doc.handleCancel} />
       )}
     </>
   );

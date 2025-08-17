@@ -1,4 +1,4 @@
-export const createUISlice = (set, get) => ({
+export const createUIState = (set, get) => ({
   // UI state
   sidebarCollapsed: false,
   activeTab: "chat",

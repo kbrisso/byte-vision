@@ -2,23 +2,16 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 func ParseDefaultLlamaCliEnv() LlamaCliArgs {
 	out := LlamaCliArgs{
-		Description: os.Getenv("Description"),
-
-		// ----- common params -----
-		HelpCmd:                    os.Getenv("HelpCmd"),
-		HelpCmdEnabled:             getEnvBool(os.Getenv("HelpCmdEnabled"), false),
-		VersionCmd:                 os.Getenv("VersionCmd"),
-		VersionCmdEnabled:          getEnvBool(os.Getenv("VersionCmdEnabled"), false),
-		CompletionBashCmd:          os.Getenv("CompletionBashCmd"),
-		CompletionBashCmdEnabled:   getEnvBool(os.Getenv("CompletionBashCmdEnabled"), false),
+		Description:                os.Getenv("Description"),
 		VerbosePromptCmd:           os.Getenv("VerbosePromptCmd"),
 		VerbosePromptCmdEnabled:    getEnvBool(os.Getenv("VerbosePromptCmdEnabled"), false),
 		ThreadsCmd:                 os.Getenv("ThreadsCmd"),
@@ -234,8 +227,6 @@ func ParseDefaultLlamaCliEnv() LlamaCliArgs {
 		// ----- example-specific params -----
 		NoDisplayPromptCmd:         os.Getenv("NoDisplayPromptCmd"),
 		NoDisplayPromptEnabled:     getEnvBool(os.Getenv("NoDisplayPromptEnabled"), false),
-		ColorCmd:                   os.Getenv("ColorCmd"),
-		ColorCmdEnabled:            getEnvBool(os.Getenv("ColorCmdEnabled"), false),
 		NoContextShiftCmd:          os.Getenv("NoContextShiftCmd"),
 		NoContextShiftCmdEnabled:   getEnvBool(os.Getenv("NoContextShiftCmdEnabled"), false),
 		SystemPromptCmd:            os.Getenv("SystemPromptCmd"),
@@ -297,12 +288,6 @@ func ParseDefaultLlamaEmbedEnv() LlamaEmbedArgs {
 		Description: os.Getenv("Description"),
 
 		// ----- common params -----
-		EmbedHelpCmd:                    os.Getenv("EmbedHelpCmd"),
-		EmbedHelpCmdEnabled:             getEnvBool(os.Getenv("EmbedHelpCmdEnabled"), false),
-		EmbedVersionCmd:                 os.Getenv("EmbedVersionCmd"),
-		EmbedVersionCmdEnabled:          getEnvBool(os.Getenv("EmbedVersionCmdEnabled"), false),
-		EmbedCompletionBashCmd:          os.Getenv("EmbedCompletionBashCmd"),
-		EmbedCompletionBashCmdEnabled:   getEnvBool(os.Getenv("EmbedCompletionBashCmdEnabled"), false),
 		EmbedVerbosePromptCmd:           os.Getenv("EmbedVerbosePromptCmd"),
 		EmbedVerbosePromptCmdEnabled:    getEnvBool(os.Getenv("EmbedVerbosePromptCmdEnabled"), false),
 		EmbedThreadsCmd:                 os.Getenv("EmbedThreadsCmd"),
@@ -584,9 +569,6 @@ func LlamaCliStructToArgs(args LlamaCliArgs) []string {
 	}
 
 	// ----- common params -----
-	addCmdBoolPair(args.HelpCmd, args.HelpCmdEnabled)
-	addCmdBoolPair(args.VersionCmd, args.VersionCmdEnabled)
-	addCmdBoolPair(args.CompletionBashCmd, args.CompletionBashCmdEnabled)
 	addCmdBoolPair(args.VerbosePromptCmd, args.VerbosePromptCmdEnabled)
 	addCmdValPair(args.ThreadsCmd, args.ThreadsVal)
 	addCmdValPair(args.ThreadsBatchCmd, args.ThreadsBatchVal)
@@ -743,9 +725,6 @@ func LlamaEmbedStructToArgs(args LlamaEmbedArgs) []string {
 	}
 
 	// ----- common params -----
-	addCmdBoolPair(args.EmbedHelpCmd, args.EmbedHelpCmdEnabled)
-	addCmdBoolPair(args.EmbedVersionCmd, args.EmbedVersionCmdEnabled)
-	addCmdBoolPair(args.EmbedCompletionBashCmd, args.EmbedCompletionBashCmdEnabled)
 	addCmdBoolPair(args.EmbedVerbosePromptCmd, args.EmbedVerbosePromptCmdEnabled)
 	addCmdValPair(args.EmbedThreadsCmd, args.EmbedThreadsVal)
 	addCmdValPair(args.EmbedThreadsBatchCmd, args.EmbedThreadsBatchVal)
@@ -900,12 +879,6 @@ type LlamaCliArgs struct {
 	Description string `json:"Description"`
 
 	// ----- common params -----
-	HelpCmd                    string `json:"HelpCmd"`
-	HelpCmdEnabled             bool   `json:"HelpCmdEnabled"`
-	VersionCmd                 string `json:"VersionCmd"`
-	VersionCmdEnabled          bool   `json:"VersionCmdEnabled"`
-	CompletionBashCmd          string `json:"CompletionBashCmd"`
-	CompletionBashCmdEnabled   bool   `json:"CompletionBashCmdEnabled"`
 	VerbosePromptCmd           string `json:"VerbosePromptCmd"`
 	VerbosePromptCmdEnabled    bool   `json:"VerbosePromptCmdEnabled"`
 	ThreadsCmd                 string `json:"ThreadsCmd"`
@@ -1181,12 +1154,6 @@ type LlamaEmbedArgs struct {
 	Description string `json:"Description"`
 
 	// ----- common params -----
-	EmbedHelpCmd                    string `json:"EmbedHelpCmd"`
-	EmbedHelpCmdEnabled             bool   `json:"EmbedHelpCmdEnabled"`
-	EmbedVersionCmd                 string `json:"EmbedVersionCmd"`
-	EmbedVersionCmdEnabled          bool   `json:"EmbedVersionCmdEnabled"`
-	EmbedCompletionBashCmd          string `json:"EmbedCompletionBashCmd"`
-	EmbedCompletionBashCmdEnabled   bool   `json:"EmbedCompletionBashCmdEnabled"`
 	EmbedVerbosePromptCmd           string `json:"EmbedVerbosePromptCmd"`
 	EmbedVerbosePromptCmdEnabled    bool   `json:"EmbedVerbosePromptCmdEnabled"`
 	EmbedThreadsCmd                 string `json:"EmbedThreadsCmd"`

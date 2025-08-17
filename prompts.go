@@ -25,15 +25,15 @@ func (sp *SystemPrompt) SetInput(input string) {
 	sp.Input = input
 }
 
-// InstPrompt represents an instruction-based prompt structure
-type InstPrompt struct {
-	InstStart string
+// UserPrompt represents an instruction-based prompt structure
+type UserPrompt struct {
+	UserStart string
 	Input     string
-	InstEnd   string
+	UserEnd   string
 }
 
 // SetInput implements the PromptData interface
-func (ip *InstPrompt) SetInput(input string) {
+func (ip *UserPrompt) SetInput(input string) {
 	ip.Input = input
 }
 
@@ -61,7 +61,7 @@ func NewPromptRegistry() *PromptRegistry {
 
 func (pr *PromptRegistry) registerPrompts() {
 	systemTemplate := "{{.SystemPrompt }}{{.UserPrompt }}{{.Input }}{{.AssistantPrompt }}"
-	instTemplate := "{{.InstStart }}{{.Input }}{{.InstEnd }}"
+	instTemplate := "{{.UserStart }}{{.Input }}{{.UserEnd }}"
 
 	pr.configs = map[string]PromptConfig{
 		"LLAMA2": {
@@ -75,7 +75,7 @@ func (pr *PromptRegistry) registerPrompts() {
 		"LLAMA3": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
-				SystemPrompt:    "<|begin_of_text|><|start_header_id|><|end_header_id|>You're a helpful AI assistant.<|eot_id|>\r\n",
+				SystemPrompt:    "<|begin_of_text|><|start_header_id|><|end_header_id|>You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n<|eot_id|>\n",
 				UserPrompt:      "<|start_header_id|>User<|end_header_id|>\r\n",
 				AssistantPrompt: "<|eot_id|><|start_header_id|>Assistant<|end_header_id|>\r\n",
 			},
@@ -83,32 +83,39 @@ func (pr *PromptRegistry) registerPrompts() {
 		"SystemUserAssistant": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
-				SystemPrompt:    "System You're a helpful AI assistant. \r\n",
-				UserPrompt:      "User \r\n",
-				AssistantPrompt: "Assistant \r\n",
+				SystemPrompt:    "System You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\n Please follow these instructions:\n",
+				UserPrompt:      "User\n",
+				AssistantPrompt: "Assistant\n",
 			},
 		},
 		"UserAssistantDeepSeek": {
 			Template: instTemplate,
-			Data: &InstPrompt{
-				InstStart: "<｜User｜>",
-				InstEnd:   "<｜Assistant｜>\n<think>\n</think>\n",
+			Data: &UserPrompt{
+				UserStart: "<｜User｜>",
+				UserEnd:   "<｜Assistant｜>\n<think>\n</think>\n",
 			},
 		},
 		"Qwen3": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
 				SystemPrompt:    "",
-				UserPrompt:      "<|im_start|>\nuser You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\n Please follow these instructions:\n",
+				UserPrompt:      "<|im_start|>\nuser You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
 				AssistantPrompt: "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
 			},
 		},
 		"Granite": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
-				SystemPrompt:    "<|start_of_role|>system<|end_of_role|>You're a helpful AI assistant.<|end_of_text|>\r\n",
-				UserPrompt:      "<|start_of_role|>user<|end_of_role|> \r\n",
-				AssistantPrompt: "<|end_of_text|>\r\n<|start_of_role|>assistant<|end_of_role|> \r\n",
+				SystemPrompt:    "<|start_of_role|>system<|end_of_role|>You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n<|end_of_text|>\r\n",
+				UserPrompt:      "<|start_of_role|>user<|end_of_role|> \n",
+				AssistantPrompt: "<|end_of_text|>\n<|start_of_role|>assistant<|end_of_role|>\n",
+			},
+		},
+		"Gemma": {
+			Template: instTemplate,
+			Data: &UserPrompt{
+				UserStart: "<start_of_turn>user You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
+				UserEnd:   "<end_of_turn>\n<start_of_turn>model\n",
 			},
 		},
 		"FreeForm": {
@@ -177,11 +184,11 @@ func (tp *TemplateProcessor) copyPromptData(data PromptData) PromptData {
 			Input:           v.Input,
 			AssistantPrompt: v.AssistantPrompt,
 		}
-	case *InstPrompt:
-		return &InstPrompt{
-			InstStart: v.InstStart,
+	case *UserPrompt:
+		return &UserPrompt{
+			UserStart: v.UserStart,
 			Input:     v.Input,
-			InstEnd:   v.InstEnd,
+			UserEnd:   v.UserEnd,
 		}
 	default:
 		return data // Fallback for unknown types
