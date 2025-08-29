@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"os"
 	"path/filepath"
+
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 // SetMetadata sets the document metadata key to value

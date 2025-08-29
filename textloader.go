@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"os"
+
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 type TextLoader struct {
@@ -35,7 +36,7 @@ func (t *TextLoader) WithMetadata(metadata Meta) *TextLoader {
 	return t
 }
 
-func (t *TextLoader) Load(log logger.Logger, ctx context.Context) ([]Document, error) {
+func (t *TextLoader) Load(log logger.Logger, ctx context.Context, appArgs DefaultAppArgs, enableStopWordRemoval bool) ([]Document, error) {
 	_ = ctx
 	err := t.validate()
 	if err != nil {
@@ -52,14 +53,14 @@ func (t *TextLoader) Load(log logger.Logger, ctx context.Context) ([]Document, e
 		},
 	}
 	if t.loader.textSplitter != nil {
-		documents = t.loader.textSplitter.SplitDocuments(documents)
+		documents = t.loader.textSplitter.SplitDocuments(log, appArgs, enableStopWordRemoval, documents)
 	}
 	return documents, nil
 }
 
-func (t *TextLoader) LoadFromSource(logger logger.Logger, ctx context.Context, source string) ([]Document, error) {
+func (t *TextLoader) LoadFromSource(logger logger.Logger, ctx context.Context, source string, appArgs DefaultAppArgs, enableStopWordRemoval bool) ([]Document, error) {
 	t.filename = source
-	return t.Load(logger, ctx)
+	return t.Load(logger, ctx, appArgs, enableStopWordRemoval)
 }
 
 func (t *TextLoader) validate() error {

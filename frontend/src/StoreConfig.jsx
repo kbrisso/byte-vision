@@ -25,6 +25,9 @@ const storeConfig = {
         // Document and parser
         selectedDocumentId: state.selectedDocument?.id,
         lastParserConfig: state.lastParserConfig,
+
+        // Add selectedPromptType to persistence
+        selectedPromptType: state.selectedPromptType,
     }),
 };
 
@@ -123,6 +126,9 @@ const selectSettingsState = (state) => ({
     settingsLoading: state.settingsLoading,
     settingsError: state.settingsError,
     settingsInitialized: state.settingsInitialized,
+
+    selectedPromptType: state.selectedPromptType,
+    setSelectedPromptType: state.setSelectedPromptType,
 
     // Models
     models: state.models,

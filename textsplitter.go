@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jonathanhecl/chunker"
 	"github.com/wailsapp/wails/v2/pkg/logger"
 )
@@ -122,23 +123,15 @@ func (r *RecursiveCharacterTextSplitter) WithLengthFunction(
 	return r
 }
 
-func (r *RecursiveCharacterTextSplitter) SplitDocuments(log logger.Logger, appArgs DefaultAppArgs, documents []Document) []Document {
+func (r *RecursiveCharacterTextSplitter) SplitDocuments(log logger.Logger, appArgs DefaultAppArgs, enableStopWordRemoval bool, documents []Document) []Document {
 	docs := make([]Document, 0)
 	var sourceStr string
+	var allContent strings.Builder // Collect all content
+
 	for i, doc := range documents {
-		// Extract filename from metadata or use default
-		filename := "parsed.txt" // default
-		if sourcePath, exists := doc.Metadata[SourceMetadataKey]; exists {
-			if sourceStr, ok := sourcePath.(string); ok {
-				filename = filepath.Base(sourceStr) + "_parsed.txt"
-			}
-		}
 
-		doc.Content = RemoveStopWordsFast(doc.Content)
-
-		err := SaveAsText(appArgs.PromptTempPath, filename, doc.Content, log)
-		if err != nil {
-			log.Error(err.Error())
+		if enableStopWordRemoval {
+			doc.Content = RemoveStopWordsFast(doc.Content)
 		}
 
 		for _, chunk := range r.SplitText(appArgs, log, doc.Content, sourceStr) {
@@ -146,6 +139,9 @@ func (r *RecursiveCharacterTextSplitter) SplitDocuments(log logger.Logger, appAr
 			for k, v := range documents[i].Metadata {
 				metadata[k] = v
 			}
+
+			allContent.WriteString(chunk)
+
 			docs = append(docs,
 				Document{
 					Content:  chunk,
@@ -154,6 +150,17 @@ func (r *RecursiveCharacterTextSplitter) SplitDocuments(log logger.Logger, appAr
 			)
 		}
 	}
+
+	// Save all content once after the loop with unique filename
+	if allContent.Len() > 0 {
+		uniqueID := uuid.New().String()
+		allDocsFilename := "all_documents_parsed_" + uniqueID + ".txt"
+		err := SaveAsText(appArgs.PromptTempPath, allDocsFilename, allContent.String(), log)
+		if err != nil {
+			log.Error(err.Error())
+		}
+	}
+
 	return docs
 }
 
@@ -198,14 +205,17 @@ func (r *RecursiveCharacterTextSplitter) SplitText(appArgs DefaultAppArgs, log l
 	out := c.Chunk(regex.ReplaceAllString(re.ReplaceAllString(text, ""), " "))
 
 	// Use the provided filename instead of hardcoded "chunked.txt"
+
 	if len(filename) > 0 {
-		outputFilename := filepath.Base(filename) + "_chunked.txt"
+		baseFilename := filepath.Base(filename)
+		outputFilename := generateUniqueFileName(baseFilename + "_chunked")
 		err := SaveAsText(appArgs.PromptTempPath, outputFilename, strings.Join(out, "\n"), log)
 		if err != nil {
 			log.Error(err.Error())
 		}
 	} else {
-		err := SaveAsText(appArgs.PromptTempPath, "chunked.txt", strings.Join(out, "\n"), log)
+		outputFilename := generateUniqueFileName("chunked")
+		err := SaveAsText(appArgs.PromptTempPath, outputFilename, strings.Join(out, "\n"), log)
 		if err != nil {
 			log.Error(err.Error())
 		}

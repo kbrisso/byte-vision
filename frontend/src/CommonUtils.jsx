@@ -1,16 +1,18 @@
+import { Document, Text, View, Page } from "@react-pdf/renderer";
 
 /**
  * Prompt types for different AI models
  */
 export const PROMPT_TYPES = [
-  "LLAMA2",
+  "Mistral",
   "LLAMA3",
   "Granite",
   "Qwen3",
   "SystemUserAssistant",
   "UserAssistantDeepSeek",
   "FeeForm",
-   "Gemma",
+  "Gemma",
+  "GPTOSS",
 ];
 
 /**

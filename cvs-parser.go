@@ -5,10 +5,11 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 func NewCSVLoader(logger logger.Logger, filename string) *CSVLoader {

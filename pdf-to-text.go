@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 	"syscall"
+
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 var (
@@ -39,7 +41,7 @@ func (p *PDFLoader) WithTextSplitter(textSplitter TextSplitterLoader) *PDFLoader
 	return p
 }
 
-func (p *PDFLoader) Load(ctx context.Context) ([]Document, error) {
+func (p *PDFLoader) Load(ctx context.Context, logger logger.Logger, appArgs DefaultAppArgs, enableStopWordRemoval bool) ([]Document, error) {
 	fileInfo, err := os.Stat(p.path)
 	if err != nil {
 		return nil, err
@@ -56,15 +58,15 @@ func (p *PDFLoader) Load(ctx context.Context) ([]Document, error) {
 	}
 
 	if p.loader.textSplitter != nil {
-		documents = p.loader.textSplitter.SplitDocuments(documents)
+		documents = p.loader.textSplitter.SplitDocuments(logger, appArgs, enableStopWordRemoval, documents)
 	}
 
 	return documents, nil
 }
 
-func (p *PDFLoader) LoadFromSource(ctx context.Context, source string) ([]Document, error) {
+func (p *PDFLoader) LoadFromSource(ctx context.Context, source string, logger logger.Logger, appArgs DefaultAppArgs, enableStopWordRemoval bool) ([]Document, error) {
 	p.path = source
-	return p.Load(ctx)
+	return p.Load(ctx, logger, appArgs, enableStopWordRemoval)
 }
 
 func (p *PDFLoader) loadFile(ctx context.Context) ([]Document, error) {
@@ -78,7 +80,8 @@ func (p *PDFLoader) loadFile(ctx context.Context) ([]Document, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		fmt.Println(p.path)
+		return nil, nil
 	}
 	metadata := make(Meta)
 	metadata[SourceMetadataKey] = p.path

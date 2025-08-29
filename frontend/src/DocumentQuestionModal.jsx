@@ -1,122 +1,146 @@
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
+import { useEffect, useState } from "react"; // Add this import
 import MarkdownPreview from "@uiw/react-markdown-preview";
+
+// eslint-disable-next-line import/order
+import ChatMessage from "./ChatMessageComponent.jsx";
+
+
+
+
 import "../public/main.css";
 import PDFDocumentViewer from "./PDFDocumentViewer";
 import { useDocumentQuestionState } from "./DocumentQuestionState.jsx";
 
 const DocumentQuestionModal = ({
-  show,
-  handleClose,
-  cliState,
-  embState,
-  docId,
-  indexValue,
-  sourceLocation,
-  title,
-}) => {
-  // Use the dedicated document question state hook
-  const doc = useDocumentQuestionState({
-    show,
-    docId,
-    indexValue,
-    sourceLocation,
-    cliState,
-    embState,
-  });
+                                   show,
+                                   handleClose,
+                                   cliState,
+                                   embState,
+                                   docId,
+                                   indexValue,
+                                   sourceLocation,
+                                   title,
+                               }) => {
+    // Use the dedicated document question state hook
+    const doc = useDocumentQuestionState({
+        show,
+        docId,
+        indexValue,
+        sourceLocation,
+        cliState,
+        embState,
+    });
 
-  // Progress Message Container Component
-  const ProgressMessageContainer = ({ progressMessage, onCancel }) => {
-    if (!progressMessage) return null;
+    // Progress Message Container Component
+    const ProgressMessageContainer = ({ progressMessage, onCancel }) => {
+        const [elapsedTime, setElapsedTime] = useState(0);
 
-    return (
-      <div
-        className="position-fixed"
-        style={{
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          zIndex: 9999,
-          minWidth: "400px",
-          maxWidth: "600px",
-        }}
-      >
-        <div
-          className="card shadow-lg border-0"
-          style={{
-            backgroundColor: "var(--bg-card)",
-            borderColor: "var(--border-secondary)",
-          }}
-        >
-          <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <div className="d-flex align-items-center">
-              <Spinner animation="border" size="sm" className="me-2" />
-              <h6 className="mb-0">Processing Query</h6>
-            </div>
-            {onCancel && (
-              <Button
-                variant="outline-light"
-                size="sm"
-                onClick={onCancel}
-                className="btn-close-custom"
-              >
-                <i className="bi bi-x-lg"></i>
-              </Button>
-            )}
-          </div>
-          <div className="card-body">
-            <div className="mb-3">
-              <div className="d-flex justify-content-between align-items-center mb-2">
-                <span className="text-muted small">Progress</span>
-                <span className="badge bg-primary">
+        // Update elapsed time every second
+        useEffect(() => {
+            if (!progressMessage?.startTime) return;
+
+            const interval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - progressMessage.startTime) / 1000);
+                setElapsedTime(elapsed);
+            }, 1000);
+
+            // Initial calculation
+            const initialElapsed = Math.floor((Date.now() - progressMessage.startTime) / 1000);
+            setElapsedTime(initialElapsed);
+
+            return () => clearInterval(interval);
+        }, [progressMessage?.startTime]);
+
+        if (!progressMessage) return null;
+
+        return (
+            <div
+                className="position-fixed"
+                style={{
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    zIndex: 9999,
+                    minWidth: "400px",
+                    maxWidth: "600px",
+                }}
+            >
+                <div
+                    className="card shadow-lg border-0"
+                    style={{
+                        backgroundColor: "var(--bg-card)",
+                        borderColor: "var(--border-secondary)",
+                    }}
+                >
+                    <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <div className="d-flex align-items-center">
+                            <Spinner animation="border" size="sm" className="me-2" />
+                            <h6 className="mb-0">Processing Query</h6>
+                        </div>
+                        {onCancel && (
+                            <Button
+                                variant="outline-light"
+                                size="sm"
+                                onClick={onCancel}
+                                className="btn-close-custom"
+                            >
+                                <i className="bi bi-x-lg"></i>
+                            </Button>
+                        )}
+                    </div>
+                    <div className="card-body">
+                        <div className="mb-3">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <span className="text-muted small">Progress</span>
+                                <span className="badge bg-primary">
                   {progressMessage.progress || 0}%
                 </span>
-              </div>
-              <div className="progress" style={{ height: "8px" }}>
-                <div
-                  className="progress-bar bg-primary"
-                  role="progressbar"
-                  style={{ width: `${progressMessage.progress || 0}%` }}
-                  aria-valuenow={progressMessage.progress || 0}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                ></div>
-              </div>
-            </div>
+                            </div>
+                            <div className="progress" style={{ height: "8px" }}>
+                                <div
+                                    className="progress-bar bg-primary"
+                                    role="progressbar"
+                                    style={{ width: `${progressMessage.progress || 0}%` }}
+                                    aria-valuenow={progressMessage.progress || 0}
+                                    aria-valuemin="0"
+                                    aria-valuemax="100"
+                                ></div>
+                            </div>
+                        </div>
 
-            <div className="mb-3">
-              <h6 className="mb-2">Current Step:</h6>
-              <p className="mb-0 text-muted">
-                {progressMessage.message || "Initializing..."}
-              </p>
-            </div>
+                        <div className="mb-3">
+                            <h6 className="mb-2">Current Step:</h6>
+                            <p className="mb-0 text-muted">
+                                {progressMessage.message || "Initializing..."}
+                            </p>
+                        </div>
 
-            {progressMessage.details && (
-              <div className="mb-3">
-                <h6 className="mb-2">Details:</h6>
-                <div
-                  className="p-2 rounded"
-                  style={{
-                    backgroundColor: "var(--bg-secondary)",
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  {progressMessage.details}
+                        {progressMessage.details && (
+                            <div className="mb-3">
+                                <h6 className="mb-2">Details:</h6>
+                                <div
+                                    className="p-2 rounded"
+                                    style={{
+                                        backgroundColor: "var(--bg-secondary)",
+                                        fontSize: "0.9rem",
+                                    }}
+                                >
+                                    {progressMessage.details}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="text-muted small">
+                            <i className="bi bi-clock me-1"></i>
+                            Elapsed: {elapsedTime}s
+                        </div>
+                    </div>
                 </div>
-              </div>
-            )}
+            </div>
+        );
+    };
 
-            {progressMessage.startTime && (
-              <div className="text-muted small">
-                <i className="bi bi-clock me-1"></i>
-                Elapsed:{" "}
-                {Math.floor((Date.now() - progressMessage.startTime) / 1000)}s
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
 
     const HistoryItem = ({ item, index, selectedHistoryId, onSelectHistoryItem, formatDate }) => {
         const isSelected = selectedHistoryId === (item._id?.$oid || item._id);
@@ -317,16 +341,14 @@ const DocumentQuestionModal = ({
               <h6 className="mb-0">Response</h6>
             </div>
             <div className="card-body">
-              <pre
-                className="bg-dark p-3 rounded"
-                style={{
-                  fontSize: "0.8rem",
-                  lineHeight: "1.4",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
-                <MarkdownPreview source={doc.selectedHistoryItem.response} />
-              </pre>
+                <div style={{ whiteSpace: "pre-wrap" }}>
+                <MarkdownPreview style={{
+                    backgroundColor: "transparent",
+                    color: "inherit",
+                    margin: 0,
+                    fontSize: "inherit"
+                }} source={doc.selectedHistoryItem.response} />
+              </div>
             </div>
           </div>
         </div>
@@ -415,50 +437,22 @@ const DocumentQuestionModal = ({
                     >
                       {doc.chatHistory.length === 0 ? (
                         <div className="text-center" style={{ color: "var(--text-quaternary)" }}>
-                          <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>💬</div>
+                          <div style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}></div>
                           <p className="mb-0" style={{ fontSize: "0.9rem" }}>
                             Start a conversation about this document
                           </p>
                         </div>
                       ) : (
                         doc.chatHistory.map((message, index) => (
-                          <div
+                          <ChatMessage
                             key={message.id || index}
-                            className={`mb-2 ${message.sender === "user" ? "text-end" : "text-start"}`}
-                          >
-                            <div
-                              className={`d-inline-block p-2 rounded ${
-                                message.sender === "user" ? "bg-primary text-white" : "bg-light text-dark"
-                              }`}
-                              style={{
-                                maxWidth: "85%",
-                                fontSize: "0.9rem",
-                                backgroundColor:
-                                  message.sender === "user" ? "var(--btn-primary-bg)" : "var(--bg-card)",
-                                color:
-                                  message.sender === "user" ? "var(--btn-primary-text)" : "var(--text-primary)",
-                                borderColor: "var(--border-secondary)",
-                              }}
-                            >
-                              {message.isLoading ? (
-                                <div className="progress mt-2" style={{ height: "4px" }}>
-                                  <div
-                                    className="progress-bar progress-bar-striped progress-bar-animated"
-                                    style={{ width: `${message.progress || 0}%` }}
-                                  />
-                                </div>
-                              ) : (
-                                <div style={{ whiteSpace: "pre-wrap" }}>
-                                  <MarkdownPreview source={message.content} />
-                                </div>
-                              )}
-                              {message.processTime && (
-                                <small className="d-block mt-1 opacity-75">
-                                  {(message.processTime / 1000).toFixed(1)}s
-                                </small>
-                              )}
-                            </div>
-                          </div>
+                            message={message}
+                            index={index}
+                            compact={true}
+                            showAvatar={false}
+                            showTimestamp={false}
+                            showProcessingTime={true}
+                          />
                         ))
                       )}
                     </div>

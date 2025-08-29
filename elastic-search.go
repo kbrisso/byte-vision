@@ -5,16 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/elastic/go-elasticsearch/v9"
-	"github.com/elastic/go-elasticsearch/v9/esutil"
-	"github.com/google/uuid"
-	"github.com/labstack/gommon/log"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esutil"
+	"github.com/google/uuid"
+	"github.com/labstack/gommon/log"
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 /*
@@ -593,7 +594,6 @@ func (elasticsearchWrapper *ElasticsearchClientWrapper) AddElasticsearchDocument
 
 	// Generate a unique document ID
 	documentUniqueID := uuid.New().String()
-	fmt.Println(elasticsearchDocument)
 
 	// Index the document in Elasticsearch
 	indexResponse, err := elasticsearchWrapper.elasticsearchClient.Index(indexName, esutil.NewJSONReader(elasticsearchDocument), elasticsearchWrapper.elasticsearchClient.Index.WithDocumentID(documentUniqueID), elasticsearchWrapper.elasticsearchClient.Index.WithContext(context.Background()))

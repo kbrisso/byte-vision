@@ -11,7 +11,7 @@ import {
   Spinner,
 } from "react-bootstrap";
 
-import { ChooseFile, CancelProcess } from "../wailsjs/go/main/App.js";
+import { ChooseFileOrFolderWithToggle, CancelProcess } from "../wailsjs/go/main/App.js";
 import { LogError, LogInfo } from "../wailsjs/runtime/runtime.js";
 import "../public/main.css";
 
@@ -33,6 +33,7 @@ export const DocumentParserSettings = () => {
         metaTextDesc: "",
         metaKeyWords: "",
         sourceLocation: "",
+        enableStopWordRemoval: false, // Add this new field
       }),
       [],
   );
@@ -78,13 +79,13 @@ export const DocumentParserSettings = () => {
   };
 
   // Handlers
-  const handleFormChange = useCallback((e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  }, []);
+    const handleFormChange = useCallback((e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData((prev) => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
+    }, []);
 
   const handleFormSubmit = useCallback(
       async (e) => {
@@ -99,6 +100,7 @@ export const DocumentParserSettings = () => {
           sourceLocation: formData.sourceLocation,
           chunkSize: formData.chunkSize,
           chunkOverlap: formData.chunkOverlap,
+          enableStopWordRemoval: formData.enableStopWordRemoval, // Add this line
         };
 
         try {
@@ -128,12 +130,14 @@ export const DocumentParserSettings = () => {
         formData.indexName,
         formData.sourceLocation,
         formData.title,
+        formData.enableStopWordRemoval, // Add this line
         selectedDocType,
         settings,
         startDocumentParsing,
       ],
   );
 
+  // Add this dependency
   // Add a cancel handler following the same pattern as InferenceCompletionForm
   const handleCancel = useCallback(() => {
     if (abortController) {
@@ -261,6 +265,28 @@ export const DocumentParserSettings = () => {
                     ))}
                   </div>
                 </Form.Group>
+                
+                {/* Stop Word Removal Option */}
+                <Form.Group className="mt-3">
+                  <Form.Check
+                    type="checkbox"
+                    id="enableStopWordRemoval"
+                    name="enableStopWordRemoval"
+                    checked={formData.enableStopWordRemoval}
+                    onChange={handleFormChange}
+                    label={
+                      <span className="d-flex align-items-center">
+                        <i className="bi bi-funnel me-2" style={{ fontSize: "0.8rem", color: "#64748b" }}></i>
+                        <span style={{ fontSize: "0.85rem" }}>Enable stop word removal</span>
+                      </span>
+                    }
+                    className="theme-form-check"
+                  />
+                  <Form.Text style={{ color: "#94a3b8", fontSize: "0.7rem", marginLeft: "1.5rem" }}>
+                    <i className="bi bi-info-circle me-1"></i>
+                    Remove common words (the, and, or, etc.) during text processing to improve search accuracy
+                  </Form.Text>
+                </Form.Group>
               </div>
 
               {/* Source Location */}
@@ -291,7 +317,7 @@ export const DocumentParserSettings = () => {
                     <Button
                         className="theme-input-group-button"
                         onClick={() => {
-                          ChooseFile().then((dir) => {
+                            ChooseFileOrFolderWithToggle().then((dir) => {
                             if (dir && !dir.includes("Error")) {
                               setFormData({ ...formData, sourceLocation: dir });
                             }

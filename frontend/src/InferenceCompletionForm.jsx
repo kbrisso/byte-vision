@@ -9,11 +9,12 @@ import {
     Row,
     Spinner,
 } from "react-bootstrap";
-import MarkdownPreview from "@uiw/react-markdown-preview";
+
 
 import { LogError } from "../wailsjs/runtime/runtime.js";
-import "../public/main.css";
 
+import "../public/main.css";
+import ChatMessage from "./ChatMessageComponent.jsx";
 import { useInferenceState } from "./InferenceCompletionState.jsx";
 import { PROMPT_TYPES, PDFExportDocument } from "./CommonUtils.jsx";
 
@@ -343,58 +344,15 @@ const onExportPDF = useCallback(async () => {
                                         </div>
                                     ) : (
                                         inference.messages.map((msg, index) => (
-                                            <div
-                                                key={msg.id || index}
-                                                className={`message-item ${msg.role === "user" ? "user-message" : "assistant-message"} mb-3`}
-                                            >
-                                                <div className="d-flex align-items-start">
-                                                    <div className={`message-avatar me-2 ${msg.role === "user" ? "user-avatar" : "assistant-avatar"}`}>
-                                                        <i className={msg.role === "user" ? "bi bi-person-fill" : "bi bi-robot"} />
-                                                    </div>
-                                                    <div className="message-content flex-grow-1">
-                                                        <div className="message-header d-flex align-items-center mb-1">
-                                                            <strong className="me-2">
-                                                                {msg.role === "user" ? "You" : "AI Assistant"}
-                                                            </strong>
-                                                            {msg.timestamp && (
-                                                                <small className="text-muted">
-                                                                    {new Date(msg.timestamp).toLocaleTimeString()}
-                                                                </small>
-                                                            )}
-                                                        </div>
-                                                        <div className="message-body">
-                                                            {msg.isLoading ? (
-                                                                <div className="d-flex align-items-center">
-                                                                    <Spinner animation="border" size="sm" className="me-2" />
-                                                                    <span>{msg.content}</span>
-                                                                </div>
-                                                            ) : msg.role === "error" ? (
-                                                                <div className="text-danger">
-                                                                    <i className="bi bi-exclamation-triangle me-2" />
-                                                                    {msg.content}
-                                                                </div>
-                                                            ) : (
-                                                                <pre
-                                                                    className="bg-dark p-3 rounded"
-                                                                    style={{
-                                                                        fontSize: "0.8rem",
-                                                                        lineHeight: "1.4",
-                                                                        whiteSpace: "pre-wrap",
-                                                                    }}
-                                                                >
-                                                                <MarkdownPreview
-                                                                    source={msg.content || ""}
-                                                                    style={{
-                                                                        backgroundColor: "transparent",
-                                                                        color: "inherit",
-                                                                    }}
-                                                                />
-                                                                </pre>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                          <ChatMessage
+                                            key={msg.id || index}
+                                            message={msg}
+                                            index={index}
+                                            compact={false}
+                                            showAvatar={true}
+                                            showTimestamp={true}
+                                            showProcessingTime={true}
+                                          />
                                         ))
                                     )}
 

@@ -59,17 +59,29 @@ func NewPromptRegistry() *PromptRegistry {
 	return registry
 }
 
+func NewGPTOSSPrompt(systemInstruction, assistantChannel string) *UserPrompt {
+	return &UserPrompt{
+		// System instruction + assistant channel + user message preamble
+		UserStart: "<|start|>system<|message|>" +
+			systemInstruction +
+			"<|end|><|start|>assistant<|channel|>" +
+			assistantChannel +
+			"<|start|>user<|message|>",
+		// Close the user message, and open assistant turn
+		UserEnd: "<|end|><|start|>assistant",
+	}
+}
 func (pr *PromptRegistry) registerPrompts() {
 	systemTemplate := "{{.SystemPrompt }}{{.UserPrompt }}{{.Input }}{{.AssistantPrompt }}"
 	instTemplate := "{{.UserStart }}{{.Input }}{{.UserEnd }}"
 
 	pr.configs = map[string]PromptConfig{
-		"LLAMA2": {
+		"Mistral": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
-				SystemPrompt:    "<<SYS>>\nYou're are a helpful Assistant, and you only response to the \"Assistant\"\nRemember, maintain a natural tone. Be precise, concise, and casual. Keep it short\r\n<</SYS>>\r\n",
-				UserPrompt:      " [INST] User:\r\n",
-				AssistantPrompt: "[/INST] Assistant:\r\n",
+				SystemPrompt:    "",
+				UserPrompt:      "<s>[INST]You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n\r\n",
+				AssistantPrompt: "[/INST]\r\n",
 			},
 		},
 		"LLAMA3": {
@@ -117,6 +129,14 @@ func (pr *PromptRegistry) registerPrompts() {
 				UserStart: "<start_of_turn>user You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
 				UserEnd:   "<end_of_turn>\n<start_of_turn>model\n",
 			},
+		},
+		//<|start|>system<|message|>You are ChatGPT, a large language model trained by OpenAI.\nKnowledge cutoff: 2024-06\nCurrent date: 2025-08-05\n\nReasoning: medium\n\n# Valid channels: analysis, commentary, final. Channel must be included for every message.<|end|><|start|>user<|message|>Hello<|end|><|start|>assistant<|channel|>final<|message|>Hi there!<|end|><|start|>user<|message|>What is 1+1?<|end|><|start|>assistant
+		"GPTOSS": {
+			Template: instTemplate,
+			Data: NewGPTOSSPrompt(
+				"You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.",
+				"final",
+			),
 		},
 		"FreeForm": {
 			Template: systemTemplate,

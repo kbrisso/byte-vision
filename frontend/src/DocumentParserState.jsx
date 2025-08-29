@@ -85,19 +85,19 @@ export const createParserState = (set, get) => ({
           throw new Error("Settings not loaded");
         }
 
-        // Prepare the request data
-        const requestData = {
-          requestId: requestId,
-          embeddingArguments: settings.llamaEmbed,  // Changed from 'settings'
-          embeddingType: config.selectedDocType,    // Moved from config to top level
-          indexName: config.indexName,              // Moved from config to top level
-          title: config.title,                      // Moved from config to top level
-          metaTextDesc: config.metaTextDesc,        // Moved from config to top level
-          metaKeyWords: config.metaKeyWords,        // Moved from config to top level
-          sourceLocation: config.sourceLocation,    // Moved from config to top level
-          chunkSize: parseInt(config.chunkSize),    // Moved from config to top level
-          chunkOverlap: parseInt(config.chunkOverlap), // Moved from config to top level
-        };
+          const requestData = {
+              requestId: requestId,
+              embeddingArguments: settings.llamaEmbed,
+              embeddingType: config.selectedDocType,
+              indexName: config.indexName,
+              title: config.title,
+              metaTextDesc: config.metaTextDesc,
+              metaKeyWords: config.metaKeyWords,
+              filePath: config.sourceLocation,    // Changed from sourceLocation to filePath
+              chunkSize: parseInt(config.chunkSize),
+              chunkOverlap: parseInt(config.chunkOverlap),
+              enableStopWordRemoval: config.enableStopWordRemoval || false,
+          };
 
         // Set up event listeners for this specific request
         const handleResponse = (response) => {

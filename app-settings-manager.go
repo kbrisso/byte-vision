@@ -6,22 +6,22 @@ import (
 )
 
 // GetDefaultSettings returns all the default settings for the application
-func (a *App) GetDefaultSettings() string {
-	llamaCliArgsJSON, err := json.Marshal(a.llamaCliArgs)
+func (app *App) GetDefaultSettings() string {
+	llamaCliArgsJSON, err := json.Marshal(app.llamaCliArgs)
 	if err != nil {
-		a.log.Error("Failed to marshal LlamaCli args: " + err.Error())
+		app.log.Error("Failed to marshal LlamaCli args: " + err.Error())
 		return ""
 	}
 
-	llamaEmbedArgsJSON, err := json.Marshal(a.llamaEmbedArgs)
+	llamaEmbedArgsJSON, err := json.Marshal(app.llamaEmbedArgs)
 	if err != nil {
-		a.log.Error("Failed to marshal LlamaEmbed args: " + err.Error())
+		app.log.Error("Failed to marshal LlamaEmbed args: " + err.Error())
 		return ""
 	}
 
-	appArgsJSON, err := json.Marshal(a.appArgs)
+	appArgsJSON, err := json.Marshal(app.appArgs)
 	if err != nil {
-		a.log.Error("Failed to marshal app args: " + err.Error())
+		app.log.Error("Failed to marshal app args: " + err.Error())
 		return ""
 	}
 
@@ -29,26 +29,26 @@ func (a *App) GetDefaultSettings() string {
 }
 
 // SaveCliSettings saves the current LlamaCli settings to MongoDB with the given description
-func (a *App) SaveCliSettings(description string, settings interface{}) error {
-	return SaveCliSettings(a.appArgs, description, settings)
+func (app *App) SaveCliSettings(description string, settings interface{}) error {
+	return SaveCliSettings(app.appArgs, description, settings)
 }
 
 // SaveEmbedSettings saves the current LlamaEmbed settings to MongoDB with the given description
-func (a *App) SaveEmbedSettings(description string, settings interface{}) error {
-	return SaveEmbedSettings(a.appArgs, description, settings)
+func (app *App) SaveEmbedSettings(description string, settings interface{}) error {
+	return SaveEmbedSettings(app.appArgs, description, settings)
 }
 
 // GetSavedCliSettings retrieves saved CLI settings
-func (a *App) GetSavedCliSettings() string {
-	savedSettings, err := GetSavedCliSettings(a.appArgs)
+func (app *App) GetSavedCliSettings() string {
+	savedSettings, err := GetSavedCliSettings(app.appArgs)
 	if err != nil {
-		a.log.Error("Failed to get saved CLI settings: " + err.Error())
+		app.log.Error("Failed to get saved CLI settings: " + err.Error())
 		return ""
 	}
 
 	jsonOutput, err := json.Marshal(savedSettings)
 	if err != nil {
-		a.log.Error("Failed to marshal CLI settings: " + err.Error())
+		app.log.Error("Failed to marshal CLI settings: " + err.Error())
 		return ""
 	}
 
@@ -56,16 +56,16 @@ func (a *App) GetSavedCliSettings() string {
 }
 
 // GetSavedEmbedSettings retrieves saved embed settings
-func (a *App) GetSavedEmbedSettings() string {
-	savedEmbedSettings, err := GetSavedEmbedSettings(a.appArgs)
+func (app *App) GetSavedEmbedSettings() string {
+	savedEmbedSettings, err := GetSavedEmbedSettings(app.appArgs)
 	if err != nil {
-		a.log.Error("Failed to get saved embed settings: " + err.Error())
+		app.log.Error("Failed to get saved embed settings: " + err.Error())
 		return ""
 	}
 
 	jsonOutput, err := json.Marshal(savedEmbedSettings)
 	if err != nil {
-		a.log.Error("Failed to marshal embed settings: " + err.Error())
+		app.log.Error("Failed to marshal embed settings: " + err.Error())
 		return ""
 	}
 

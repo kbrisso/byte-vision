@@ -72,13 +72,13 @@ const formatDate = (dateString) => {
  */
 export const useInferenceState = () => {
   // Settings from external hook (only settings, not chat state)
-  const { settings, settingsLoading } = useSettingsState();
+  const { settings, settingsLoading,selectedPromptType, setSelectedPromptType } = useSettingsState();
 
   // Internal state management (no useChatState dependency)
   const [messages, setMessages] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(null);
-  const [selectedPromptType, setSelectedPromptType] = useState("");
+
   const [currentMessage, setCurrentMessage] = useState("");
   const [textareaFocused, setTextareaFocused] = useState(false);
   const [savedChats, setSavedChats] = useState([]);
@@ -177,16 +177,38 @@ export const useInferenceState = () => {
 
   const handleInferenceProgress = useCallback((progressData) => {
     try {
-      setProgress({
-        status: progressData?.status,
-        message: progressData?.message,
-        progress: progressData?.progress,
-        requestId: progressData?.requestId,
+      const currentProgress = progressData?.progress || 0;
+      const status = progressData?.status || "processing";
+
+      setProgress(prevProgress => {
+        // Don't update if we've already completed (100%) and received the response
+        if (prevProgress?.progress === 100 && status === "completed" && !isGenerating) {
+          return prevProgress;
+        }
+
+        // Only update if progress is moving forward or status has changed
+        if (prevProgress && prevProgress.progress > currentProgress && status === prevProgress.status) {
+          return prevProgress; // Don't go backwards in progress
+        }
+
+        return {
+          status,
+          message: progressData?.message || "Processing...",
+          progress: currentProgress,
+          requestId: progressData?.requestId,
+        };
       });
+
+      // Auto-hide progress overlay after a brief delay when reaching 100%
+      if (currentProgress >= 100 && status === "completed") {
+        setTimeout(() => {
+          setProgress(null);
+        }, 500); // Small delay to show completion before hiding
+      }
     } catch (err) {
       LogError(`Error handling inference progress: ${err?.message || err}`);
     }
-  }, []);
+  }, [isGenerating]);
 
   // Event handling initialization
   const initializeInferenceListeners = useCallback(() => {

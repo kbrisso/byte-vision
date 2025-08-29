@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/labstack/gommon/log"
 	"github.com/wailsapp/wails/v2/pkg/logger"
 
@@ -14,15 +15,20 @@ import (
 type DirectoryLoader struct {
 	loader Loader
 
-	dirname        string
-	regExPathMatch string
-	logger         logger.Logger
+	dirname               string
+	regExPathMatch        string
+	logger                logger.Logger
+	appArgs               DefaultAppArgs
+	enableStopWordRemoval bool
 }
 
-func NewDirectoryLoader(dirname string, regExPathMatch string) *DirectoryLoader {
+func NewDirectoryLoader(dirname string, regExPathMatch string, logger logger.Logger, appArgs DefaultAppArgs, enableStopWordRemoval bool) *DirectoryLoader {
 	return &DirectoryLoader{
-		dirname:        dirname,
-		regExPathMatch: regExPathMatch,
+		dirname:               dirname,
+		regExPathMatch:        regExPathMatch,
+		logger:                logger,
+		appArgs:               appArgs,
+		enableStopWordRemoval: enableStopWordRemoval,
 	}
 }
 
@@ -31,7 +37,7 @@ func (d *DirectoryLoader) WithTextSplitter(textSplitter TextSplitterLoader) *Dir
 	return d
 }
 
-func (d *DirectoryLoader) Load(ctx context.Context) ([]Document, error) {
+func (d *DirectoryLoader) Load(ctx context.Context, logger logger.Logger, appArgs DefaultAppArgs, enableStopWordRemoval bool) ([]Document, error) {
 	err := d.validate()
 	if err != nil {
 		return nil, err
@@ -45,7 +51,7 @@ func (d *DirectoryLoader) Load(ctx context.Context) ([]Document, error) {
 	docs := []Document{}
 	err = filepath.Walk(d.dirname, func(path string, info os.FileInfo, err error) error {
 		if err == nil && regExp.MatchString(info.Name()) {
-			d, errLoad := NewTextLoader(path, nil).Load(d.logger, ctx)
+			d, errLoad := NewTextLoader(path, nil).Load(logger, ctx, appArgs, enableStopWordRemoval)
 			if errLoad != nil {
 				return errLoad
 			}
@@ -59,11 +65,10 @@ func (d *DirectoryLoader) Load(ctx context.Context) ([]Document, error) {
 	}
 
 	if d.loader.textSplitter != nil {
-		docs = d.loader.textSplitter.SplitDocuments(docs)
+		docs = d.loader.textSplitter.SplitDocuments(logger, appArgs, enableStopWordRemoval, docs)
 	}
 	return docs, nil
 }
-
 func (d *DirectoryLoader) validate() error {
 	fileStat, err := os.Stat(d.dirname)
 	if err != nil {

@@ -4,13 +4,14 @@ import "C"
 import (
 	"context"
 	"fmt"
-	"github.com/wailsapp/wails/v2/pkg/logger"
 	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/wailsapp/wails/v2/pkg/logger"
 )
 
 var (
@@ -97,12 +98,12 @@ func GenerateEmbedWithCancel(ctx context.Context, llamaEmbedArgs LlamaEmbedArgs,
 
 }
 
-func IngestTextData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation string, chunkSize int, chunkOverlap int) ([]Document, error) {
+func IngestTextData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation string, chunkSize int, chunkOverlap int, enableStopWordRemoval bool) ([]Document, error) {
 
 	meta := Meta{}
 	meta["type"] = "text"
 	//Create docs with metad
-	documents, err := NewTextLoader(sourceLocation, meta).Load(log, context.Background())
+	documents, err := NewTextLoader(sourceLocation, meta).Load(log, context.Background(), appArgs, enableStopWordRemoval)
 	if err != nil {
 		log.Error(err.Error())
 		return nil, fmt.Errorf("error in IngestTextData: %w", err)
@@ -110,14 +111,14 @@ func IngestTextData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation st
 	if chunkSize > 0 && chunkOverlap > 0 {
 		//Split up text into chunks
 		textSplitter := NewRecursiveCharacterTextSplitter(chunkSize, chunkOverlap)
-		documentChunks := textSplitter.SplitDocuments(log, appArgs, documents)
+		documentChunks := textSplitter.SplitDocuments(log, appArgs, enableStopWordRemoval, documents)
 		return documentChunks, nil
 	} else {
 		return documents, nil
 	}
 }
 
-func IngestCVSData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation string, chunkSize int, chunkOverlap int) ([]Document, error) {
+func IngestCVSData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation string, chunkSize int, chunkOverlap int, enableStopWordRemoval bool) ([]Document, error) {
 
 	documents, err := NewCSVLoader(log, sourceLocation).Load(context.Background())
 	if err != nil {
@@ -127,26 +128,26 @@ func IngestCVSData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation str
 	}
 	if chunkSize > 0 && chunkOverlap > 0 {
 		textSplitter := NewRecursiveCharacterTextSplitter(chunkSize, chunkOverlap)
-		documentChunks := textSplitter.SplitDocuments(log, appArgs, documents)
+		documentChunks := textSplitter.SplitDocuments(log, appArgs, enableStopWordRemoval, documents)
 		return documentChunks, nil
 	} else {
 		return documents, nil
 	}
 }
 
-func IngestPdfData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation string, chunkSize int, chunkOverlap int) ([]Document, error) {
+func IngestPdfData(log logger.Logger, appArgs DefaultAppArgs, sourceLocation string, chunkSize int, chunkOverlap int, enableStopWordRemoval bool) ([]Document, error) {
 
 	//Load xpdf exe
 	loader := NewPDFToTextLoader(sourceLocation).WithPDFToTextPath(appArgs.PDFToTextPath)
 	//Create docs
-	documents, err := loader.Load(context.Background())
+	documents, err := loader.Load(context.Background(), log, appArgs, enableStopWordRemoval)
 	if err != nil {
 		log.Error(err.Error())
 		return nil, fmt.Errorf("error in IngestPdfData: %w", err)
 	}
 	if chunkSize > 0 && chunkOverlap > 0 {
 		textSplitter := NewRecursiveCharacterTextSplitter(chunkSize, chunkOverlap)
-		documentChunks := textSplitter.SplitDocuments(log, appArgs, documents)
+		documentChunks := textSplitter.SplitDocuments(log, appArgs, enableStopWordRemoval, documents)
 		return documentChunks, nil
 	} else {
 		return documents, nil

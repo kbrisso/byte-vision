@@ -1,7 +1,9 @@
 package main
 
+import "github.com/wailsapp/wails/v2/pkg/logger"
+
 type TextSplitterLoader interface {
-	SplitDocuments(documents []Document) []Document
+	SplitDocuments(logger logger.Logger, appArgs DefaultAppArgs, enableStopWordRemoval bool, documents []Document) []Document
 }
 
 type Loader struct {

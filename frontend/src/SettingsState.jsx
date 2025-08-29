@@ -20,6 +20,8 @@ export const createSettingsState = (set, get) => ({
   settingsError: null,
   initialized: false,
 
+  selectedPromptType: "",
+
   // Models and saved settings state
   models: [],
   modelsLoading: false,
@@ -43,6 +45,11 @@ export const createSettingsState = (set, get) => ({
       showAdvanced: false,
     },
   },
+
+  setSelectedPromptType: (promptType) =>
+    set((state) => {
+      state.selectedPromptType = promptType;
+    }),
 
   // Basic actions
   setSettings: (newSettings) =>
@@ -441,7 +448,6 @@ export const createSettingsState = (set, get) => ({
       errors.GPULayersCmd = "GPU Layers Command cannot be empty.";
     }
 
-
     return {
       isValid: Object.keys(errors).length === 0,
       errors,
@@ -466,7 +472,6 @@ export const createSettingsState = (set, get) => ({
     ) {
       errors.EmbedGPULayersVal = "GPU Layers cannot be empty.";
     }
-
 
     return {
       isValid: Object.keys(errors).length === 0,
