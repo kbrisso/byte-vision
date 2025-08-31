@@ -4,6 +4,8 @@ import (
 	"fmt"
 )
 
+// Handler type constants for consistent identification
+
 // EventHandler manages all application event listeners
 type EventHandler struct {
 	app              *App
@@ -37,20 +39,24 @@ func (eh *EventHandler) SetupAllEventListeners() {
 func (eh *EventHandler) recoverFromPanic(handlerName, requestID string) {
 	if r := recover(); r != nil {
 		eh.app.log.Error(fmt.Sprintf("Panic in %s: %v", handlerName, r))
-		// Emit appropriate error response based on handler type
-		switch handlerName {
-		case "handleQueryDocumentRequest":
-			eh.emitDocumentQueryError(requestID, fmt.Sprintf("Internal error: %v", r))
-		case "handleAddDocumentRequest":
-			eh.emitDocumentAddError(requestID, fmt.Sprintf("Internal error: %v", r))
-		case "handleInferenceCompletionRequest":
-			eh.emitInferenceCompletionResponse(InferenceCompletionResponse{
-				RequestID: requestID,
-				Success:   false,
-				Error:     fmt.Sprintf("Internal error: %v", r),
-			})
-		default:
-			eh.app.log.Error(fmt.Sprintf("Unhandled panic in %s for request %s: %v", handlerName, requestID, r))
-		}
+		eh.emitErrorResponse(handlerName, requestID, fmt.Sprintf("Internal error: %v", r))
+	}
+}
+
+// emitErrorResponse centralizes error response emission based on handler type
+func (eh *EventHandler) emitErrorResponse(handlerName, requestID, errorMessage string) {
+	switch handlerName {
+	case DocumentQueryHandler:
+		eh.emitDocumentQueryError(requestID, errorMessage)
+	case DocumentAddHandler:
+		eh.emitDocumentAddError(requestID, errorMessage)
+	case InferenceCompletionHandler:
+		eh.emitInferenceCompletionResponse(InferenceCompletionResponse{
+			RequestID: requestID,
+			Success:   false,
+			Error:     errorMessage,
+		})
+	default:
+		eh.app.log.Error(fmt.Sprintf("Unhandled error in %s for request %s: %s", handlerName, requestID, errorMessage))
 	}
 }

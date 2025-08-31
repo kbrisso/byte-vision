@@ -805,8 +805,8 @@ func (elasticsearchWrapper *ElasticsearchClientWrapper) SearchDocumentByIDWithVe
 		"knn": map[string]interface{}{
 			"field":          "docChunks.vector",
 			"query_vector":   searchVector,
-			"k":              5,
-			"num_candidates": 10, // Typically num_candidates is larger than k for better results
+			"k":              50,
+			"num_candidates": 150, // Typically num_candidates is larger than k for better results
 			"inner_hits": map[string]interface{}{
 				"size":    maximumResults,
 				"_source": false,

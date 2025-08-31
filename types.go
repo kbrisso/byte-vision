@@ -1441,14 +1441,6 @@ const (
 	SourceMetadataKey = "source"
 )
 
-type ReportPromptTemplate struct {
-	SystemPrompt    string
-	UserPrompt      string
-	ReportTemplate  string
-	ReportDate      string
-	AssistantPrompt string
-}
-
 type PDFLoader struct {
 	loader Loader
 

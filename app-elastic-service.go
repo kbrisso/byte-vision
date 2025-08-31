@@ -346,7 +346,7 @@ func (app *App) processDocumentByType(embeddingType, sourceLocation string, chun
 // Legacy methods (consider refactoring these as well in future iterations)
 func (app *App) QueryElasticDocument(llamaCliArgs LlamaCliArgs, llamaEmbedArgs LlamaEmbedArgs,
 	indexID string, documentID, embeddingPrompt string, documentPrompt string, promptType string, searchKeywords []string) string {
-	processingStartTime := time.Now()
+
 	app.resetContext()
 
 	select {
@@ -369,12 +369,12 @@ func (app *App) QueryElasticDocument(llamaCliArgs LlamaCliArgs, llamaEmbedArgs L
 			return app.handleEmbeddingError(err, "promptSearchVector")
 		}
 
-		keywordSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, keywordSearchVector, 15)
+		keywordSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, keywordSearchVector, 60)
 		if err != nil {
 			return app.handleSearchError(err, "keywordSearchVector")
 		}
 
-		promptSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, promptSearchVector, 15)
+		promptSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, promptSearchVector, 60)
 		if err != nil {
 			return app.handleSearchError(err, "promptSearchVector")
 		}
@@ -383,9 +383,6 @@ func (app *App) QueryElasticDocument(llamaCliArgs LlamaCliArgs, llamaEmbedArgs L
 		combinedSearchContext := deduplicatedKeywordResults + deduplicatedPromptResults
 
 		completionResult := app.generateCompletionWithPromptType(llamaCliArgs, llamaEmbedArgs, combinedSearchContext, promptType, documentID, indexID, embeddingPrompt, documentPrompt, searchKeywords)
-
-		totalProcessingTime := time.Since(processingStartTime).Milliseconds()
-		app.prepareDocumentQuestionResponse(documentID, indexID, embeddingPrompt, documentPrompt, completionResult, searchKeywords, promptType, llamaEmbedArgs, llamaCliArgs, totalProcessingTime)
 
 		return completionResult
 	}
@@ -437,7 +434,10 @@ func (app *App) generateCompletionWithPromptType(llamaCliArgs LlamaCliArgs, llam
 		app.log.Error("Failed to save prompt: " + err.Error())
 	}
 
-	llamaCliArgs.PromptText = formattedPrompt
+	llamaCliArgs.PromptFileCmd = "-f"
+	llamaCliArgs.PromptFileVal = app.appArgs.PromptTempPath + "/" + filename
+	llamaCliArgs.PromptText = ""
+
 	cliArgumentsArray := LlamaCliStructToArgs(llamaCliArgs)
 	generatedOutput, err := GenerateSingleCompletionWithCancel(app.ctx, *app.appArgs, cliArgumentsArray)
 	if err != nil {
@@ -489,9 +489,11 @@ func removeDuplicateSearchResults(keywordResults, promptResults string) (string,
 		}
 	}
 
-	deduplicatedPromptResults := strings.Join(uniquePromptResultLines, "\n")
+	keywordResults = strings.TrimSuffix(strings.TrimSuffix(strings.Join(keywordResultLines, " "), "\n\n"), "\n")
+	deduplicatedPromptResults := strings.TrimSuffix(strings.TrimSuffix(strings.Join(uniquePromptResultLines, " "), "\n\n"), "\n")
 
-	return keywordResults, deduplicatedPromptResults
+	return strings.TrimRight(keywordResults, "\n"), strings.TrimRight(deduplicatedPromptResults, "\n")
+
 }
 
 // convertMapToLlamaCliArgs converts map[string]interface{} to LlamaCliArgs struct (creates a copy)
@@ -641,14 +643,16 @@ func (app *App) isErrorResult(result string) bool {
 		return true
 	}
 
+	// Check for the specific stdout error indicators
+	if strings.TrimSpace(result) == "system exit" {
+		return true
+	}
+
 	resultLower := strings.ToLower(result)
 	errorIndicators := []string{
 		"error:",
 		"operation cancelled",
-		"failed to",
-		"panic:",
-		"invalid memory address",
-		"nil pointer",
+		"system exit", // Add this to catch case variations
 	}
 
 	for _, indicator := range errorIndicators {
@@ -662,11 +666,22 @@ func (app *App) isErrorResult(result string) bool {
 
 // extractErrorMessage extracts a clean error message from the result
 func (app *App) extractErrorMessage(result string) string {
+	// Handle empty response
+	if result == "" {
+		return "Empty response received from system"
+	}
+
+	// Handle "system exit" specifically
+	if strings.TrimSpace(result) == "system exit" {
+		return "System process exited unexpectedly"
+	}
+
 	if strings.HasPrefix(result, "Error:") {
 		return strings.TrimSpace(strings.TrimPrefix(result, "Error:"))
 	}
 	if strings.HasPrefix(result, "error:") {
 		return strings.TrimSpace(strings.TrimPrefix(result, "error:"))
 	}
+
 	return result
 }

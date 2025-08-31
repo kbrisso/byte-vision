@@ -11,6 +11,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// Constants for event names
+
 // InferenceEventHandler delegates inference event setup to the core EventHandler
 type InferenceEventHandler struct {
 	core *EventHandler
@@ -28,21 +30,18 @@ func (h *InferenceEventHandler) SetupEventListeners() {
 }
 
 func (eh *EventHandler) setupInferenceCompletionEventListener() {
-	eh.app.log.Info("Setting up inference event listener...")
-
-	runtime.EventsOn(eh.app.ctx, "inference-completion-request", func(optionalData ...interface{}) {
+	eh.app.log.Info(LogSettingUpInferenceListener)
+	runtime.EventsOn(eh.app.ctx, EventInferenceCompletionRequest, func(optionalData ...interface{}) {
 		eh.processInferenceCompletionEvent(optionalData...)
 	})
-
-	eh.app.log.Info("Inference event listener setup complete")
+	eh.app.log.Info(LogInferenceListenerComplete)
 }
 
 func (eh *EventHandler) processInferenceCompletionEvent(optionalData ...interface{}) {
-	const eventName = "inference-completion-request"
-	eh.app.log.Info(fmt.Sprintf("Received %s event with %d parameters", eventName, len(optionalData)))
+	eh.app.log.Info(fmt.Sprintf("Received %s event with %d parameters", EventInferenceCompletionRequest, len(optionalData)))
 
 	if len(optionalData) == 0 {
-		eh.app.log.Info(fmt.Sprintf("No data received in %s event", eventName))
+		eh.app.log.Info(fmt.Sprintf("No data received in %s event", EventInferenceCompletionRequest))
 		return
 	}
 
@@ -63,7 +62,7 @@ func (eh *EventHandler) processInferenceCompletionEvent(optionalData ...interfac
 func (eh *EventHandler) parseInferenceRequest(data interface{}) (InferenceCompletionRequest, error) {
 	requestData, ok := data.(map[string]interface{})
 	if !ok {
-		return InferenceCompletionRequest{}, fmt.Errorf("invalid request data format")
+		return InferenceCompletionRequest{}, fmt.Errorf(ErrorInvalidRequestFormat)
 	}
 
 	jsonData, err := json.Marshal(requestData)
@@ -79,13 +78,6 @@ func (eh *EventHandler) parseInferenceRequest(data interface{}) (InferenceComple
 	}
 
 	return request, nil
-}
-
-func (eh *EventHandler) extractRequestID(data interface{}) string {
-	if requestData, ok := data.(map[string]interface{}); ok {
-		return fmt.Sprintf("%v", requestData["requestId"])
-	}
-	return ""
 }
 
 func (eh *EventHandler) safeHandleInferenceCompletionRequest(request InferenceCompletionRequest) {
@@ -105,8 +97,8 @@ func (eh *EventHandler) handleInferenceCompletionRequest(request InferenceComple
 	}
 
 	processingStartTime := time.Now()
-	eh.emitProgressUpdate(request.RequestID, "starting", "Starting inference completion...", 5)
-	eh.emitProgressUpdate(request.RequestID, "processing", "Processing inference completion...", 10)
+	eh.emitProgressUpdate(request.RequestID, StatusStarting, MessageStartingInference, ProgressStart)
+	eh.emitProgressUpdate(request.RequestID, StatusProcessing, MessageProcessingInference, ProgressProcessing)
 
 	eh.app.log.Info(fmt.Sprintf("Calling inference completion with converted arguments for request: %s", request.RequestID))
 
@@ -119,50 +111,50 @@ func (eh *EventHandler) handleInferenceCompletionRequest(request InferenceComple
 func (eh *EventHandler) finalizeInferenceCompletion(requestID string, response InferenceCompletionResponse, startTime time.Time) {
 	processingTime := time.Since(startTime).Milliseconds()
 
-	eh.emitProgressUpdate(requestID, "completed", "Processing complete", 100)
-	time.Sleep(25 * time.Millisecond) // Brief delay to ensure progress reaches frontend
+	eh.emitProgressUpdate(requestID, StatusCompleted, MessageProcessingComplete, ProgressComplete)
+	time.Sleep(ProgressUIDelay) // Brief delay to ensure progress reaches frontend
 
 	eh.emitInferenceCompletionResponse(response)
 	eh.app.log.Info(fmt.Sprintf("Inference completion request %s completed in %dms", requestID, processingTime))
 }
 
 func (eh *EventHandler) generateInferenceCompletionWithProgress(request InferenceCompletionRequest) string {
-	eh.emitProgressUpdate(request.RequestID, "processing", "Processing prompt...", 20)
+	eh.emitProgressUpdate(request.RequestID, StatusProcessing, MessageProcessingPrompt, ProgressPrompt)
 
-	processedPrompt, err := eh.processPromptIfProvided(request)
+	processedPrompt, err := eh.processPrompt(request)
 	if err != nil {
-		return "Error: " + err.Error()
+		return ErrorPrefix + err.Error()
 	}
 	request.LlamaCliArgs.PromptText = processedPrompt
 
-	eh.emitProgressUpdate(request.RequestID, "generating", "Generating completion...", 50)
+	eh.emitProgressUpdate(request.RequestID, StatusGenerating, MessageGeneratingCompletion, ProgressGenerating)
 
 	completionResult, err := eh.executeCompletion(request)
 	if err != nil {
 		return eh.handleCompletionError(err)
 	}
 
-	eh.emitProgressUpdate(request.RequestID, "saving", "Saving completion...", 80)
+	eh.emitProgressUpdate(request.RequestID, StatusSaving, MessageSavingCompletion, ProgressSaving)
 
 	if eh.app.isOperationCanceled() {
-		return "Operation cancelled by user"
+		return ErrorOperationCancelledByUser
 	}
 
-	eh.saveCompletionToDatabase(request.LlamaCliArgs, completionResult, request.LlamaCliArgs.PromptText)
-	eh.emitProgressUpdate(request.RequestID, "finalizing", "Finalizing response...", 95)
+	eh.saveCompletionToDatabase(request.LlamaCliArgs, completionResult, request.PromptText)
+	eh.emitProgressUpdate(request.RequestID, StatusFinalizing, MessageFinalizingResponse, ProgressFinalizing)
 
 	return string(completionResult)
 }
 
-func (eh *EventHandler) processPromptIfProvided(request InferenceCompletionRequest) (string, error) {
-	originalPromptText := request.LlamaCliArgs.PromptText
+func (eh *EventHandler) processPrompt(request InferenceCompletionRequest) (string, error) {
+	originalPromptText := request.PromptText
 	if len(originalPromptText) == 0 {
 		return originalPromptText, nil
 	}
 
 	processedPrompt, err := HandlePromptType(eh.app.log, request.PromptType, originalPromptText)
 	if err != nil {
-		eh.app.log.Error("Failed to handle prompt type: " + err.Error())
+		eh.app.log.Error(LogFailedToHandlePromptType + err.Error())
 		return "", err
 	}
 
@@ -179,16 +171,16 @@ func (eh *EventHandler) executeCompletion(request InferenceCompletionRequest) ([
 
 func (eh *EventHandler) handleCompletionError(err error) string {
 	if errors.Is(eh.app.operationCtx.Err(), context.Canceled) {
-		eh.app.log.Info("Completion generation was cancelled by user")
-		return "Operation cancelled by user"
+		eh.app.log.Info(LogCompletionCancelledByUser)
+		return ErrorOperationCancelledByUser
 	}
-	eh.app.log.Error("Failed to generate completion: " + err.Error())
-	return "Error: " + err.Error()
+	eh.app.log.Error(LogFailedToGenerateCompletion + err.Error())
+	return ErrorPrefix + err.Error()
 }
 
 func (eh *EventHandler) saveCompletionToDatabase(llamaArgs LlamaCliArgs, output []byte, originalPrompt string) {
 	if err := eh.app.saveQuestionResponse(llamaArgs, output, originalPrompt); err != nil {
-		eh.app.log.Error("Failed to save completion: " + err.Error())
+		eh.app.log.Error(LogFailedToSaveCompletion + err.Error())
 	}
 }
 
@@ -200,12 +192,12 @@ func (eh *EventHandler) emitProgressUpdate(requestID, status, message string, pr
 		Progress:  progress,
 	}
 	eh.app.log.Info(fmt.Sprintf("Emitting inference progress: %+v", progressData))
-	runtime.EventsEmit(eh.app.ctx, "inference-completion-progress", progressData)
+	runtime.EventsEmit(eh.app.ctx, EventInferenceCompletionProgress, progressData)
 }
 
 func (eh *EventHandler) emitInferenceCompletionResponse(response InferenceCompletionResponse) {
 	eh.app.log.Info(fmt.Sprintf("Emitting inference response: %+v", response))
-	runtime.EventsEmit(eh.app.ctx, "inference-completion-response", response)
+	runtime.EventsEmit(eh.app.ctx, EventInferenceCompletionResponse, response)
 }
 
 func (eh *EventHandler) createCompletionResponse(requestID, result string, processingStartTime time.Time) InferenceCompletionResponse {

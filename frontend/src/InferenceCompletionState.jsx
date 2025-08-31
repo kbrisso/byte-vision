@@ -322,11 +322,9 @@ export const useInferenceState = () => {
                 const payload = {
                     requestId,
                     promptType: selectedPromptType,
-                    scope: INFERENCE_SCOPE,
+                    PromptText: messageToSend,
                     llamaCliArgs: {
                         ...settings?.llamaCli,
-                        PromptText: messageToSend,
-                        PromptType: selectedPromptType,
                     },
                 };
 

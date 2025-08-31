@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
 // DocumentQueryEventHandler delegates document query event setup to the core EventHandler
@@ -27,10 +26,10 @@ func (h *DocumentQueryEventHandler) SetupEventListeners() {
 }
 
 func (eh *EventHandler) setupDocumentQueryEventListener() {
-	runtime.EventsOn(eh.app.ctx, "query-document-request", func(optionalData ...interface{}) {
-		eh.app.log.Info(fmt.Sprintf("Received query-document-request event with %d parameters", len(optionalData)))
+	runtime.EventsOn(eh.app.ctx, EventQueryDocumentRequest, func(optionalData ...interface{}) {
+		eh.app.log.Info(fmt.Sprintf(LogReceivedRequest, len(optionalData)))
 		if len(optionalData) == 0 {
-			eh.app.log.Info("No data received in query-document-request event")
+			eh.app.log.Info(ErrorNoDataReceived)
 			return
 		}
 		request, err := eh.parseDocumentQueryRequest(optionalData[0])
@@ -38,7 +37,7 @@ func (eh *EventHandler) setupDocumentQueryEventListener() {
 			eh.emitDocumentQueryError("", err.Error())
 			return
 		}
-		eh.app.log.Info(fmt.Sprintf("Parsed request successfully: %+v", request))
+		eh.app.log.Info(fmt.Sprintf(LogParsedSuccessfully, request))
 		// Execute the query asynchronously with proper error recovery
 		go eh.safeHandleQueryDocumentRequest(request)
 	})
@@ -79,15 +78,16 @@ func (p *documentQueryProcessor) processRequest() {
 	// Recover from any panics in this method
 	defer p.handlePanic()
 
-	// Initialize event handler
+	// Initialize event handler FIRST, before any other operations
 	p.eventHandler = p.app.safeCreateEventHandler()
 	if p.eventHandler == nil {
 		p.app.log.Error("Failed to create event handler")
 		return
 	}
 
-	// Emit initial progress and validate request
+	// Now safe to emit progress
 	p.emitInitialProgress()
+
 	if err := p.validateRequest(); err != nil {
 		p.emitErrorResponse(err.Error())
 		return
@@ -109,12 +109,12 @@ func (p *documentQueryProcessor) processRequest() {
 
 func (p *documentQueryProcessor) handlePanic() {
 	if r := recover(); r != nil {
-		p.app.log.Error(fmt.Sprintf("Panic in handleQueryDocumentRequest: %v", r))
+		p.app.log.Error(fmt.Sprintf(ErrorPanicInHandler, r))
 		if p.eventHandler != nil {
 			p.eventHandler.emitDocumentQueryResponse(DocumentQueryResponse{
 				RequestID: p.request.RequestID,
 				Success:   false,
-				Error:     fmt.Sprintf("Internal error: %v", r),
+				Error:     fmt.Sprintf(ErrorInternalError, r),
 			})
 		}
 	}
@@ -123,15 +123,15 @@ func (p *documentQueryProcessor) handlePanic() {
 func (p *documentQueryProcessor) emitInitialProgress() {
 	p.eventHandler.emitDocumentQueryProgress(DocumentQueryProgress{
 		RequestID: p.request.RequestID,
-		Status:    "starting",
-		Message:   "Starting document query...",
-		Progress:  5,
+		Status:    ProgressStatusStarting,
+		Message:   MessageStarting,
+		Progress:  ProgressInitial,
 	})
 }
 
 func (p *documentQueryProcessor) validateRequest() error {
 	if err := p.app.validateQueryRequest(p.request); err != nil {
-		p.app.log.Error("Request validation failed: " + err.Error())
+		p.app.log.Error(ErrorRequestValidationFailed + err.Error())
 		return err
 	}
 	return nil
@@ -140,14 +140,14 @@ func (p *documentQueryProcessor) validateRequest() error {
 func (p *documentQueryProcessor) convertArguments() (LlamaCliArgs, LlamaEmbedArgs, error) {
 	cliArgs, err := p.app.convertMapToLlamaCliArgs(p.request.LlamaCliArgs)
 	if err != nil {
-		p.app.log.Error("Failed to convert CLI args: " + err.Error())
-		return LlamaCliArgs{}, LlamaEmbedArgs{}, fmt.Errorf("failed to convert CLI arguments: %w", err)
+		p.app.log.Error(ErrorFailedConvertCLI + err.Error())
+		return LlamaCliArgs{}, LlamaEmbedArgs{}, fmt.Errorf(ErrorFailedConvertCLIArgs, err)
 	}
 
 	embedArgs, err := p.app.convertMapToLlamaEmbedArgs(p.request.LlamaEmbedArgs)
 	if err != nil {
-		p.app.log.Error("Failed to convert embed args: " + err.Error())
-		return LlamaCliArgs{}, LlamaEmbedArgs{}, fmt.Errorf("failed to convert embedding arguments: %w", err)
+		p.app.log.Error(ErrorFailedConvertEmbed + err.Error())
+		return LlamaCliArgs{}, LlamaEmbedArgs{}, fmt.Errorf(ErrorFailedConvertEmbedArgs, err)
 	}
 
 	return cliArgs, embedArgs, nil
@@ -156,12 +156,12 @@ func (p *documentQueryProcessor) convertArguments() (LlamaCliArgs, LlamaEmbedArg
 func (p *documentQueryProcessor) executeQuery(cliArgs LlamaCliArgs, embedArgs LlamaEmbedArgs) string {
 	p.eventHandler.emitDocumentQueryProgress(DocumentQueryProgress{
 		RequestID: p.request.RequestID,
-		Status:    "processing",
-		Message:   "Processing document query...",
-		Progress:  10,
+		Status:    ProgressStatusProcessing,
+		Message:   MessageProcessing,
+		Progress:  ProgressProcessing,
 	})
 
-	p.app.log.Info(fmt.Sprintf("Calling QueryElasticDocument with converted arguments for request: %s", p.request.RequestID))
+	p.app.log.Info(fmt.Sprintf(LogCallingQueryElastic, p.request.RequestID))
 
 	return p.app.QueryElasticDocument(
 		cliArgs,
@@ -206,17 +206,17 @@ func (p *documentQueryProcessor) emitErrorResponse(errorMsg string) {
 func (eh *EventHandler) parseDocumentQueryRequest(data interface{}) (DocumentQueryRequest, error) {
 	requestData, ok := data.(map[string]interface{})
 	if !ok {
-		return DocumentQueryRequest{}, fmt.Errorf("invalid request data format")
+		return DocumentQueryRequest{}, fmt.Errorf(ErrorInvalidRequestFormat)
 	}
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		eh.app.log.Info("Failed to marshal request data: " + err.Error())
-		return DocumentQueryRequest{}, fmt.Errorf("failed to parse request data: %w", err)
+		eh.app.log.Info(ErrorFailedMarshalRequest + err.Error())
+		return DocumentQueryRequest{}, fmt.Errorf(ErrorFailedParseRequest, err)
 	}
 	var request DocumentQueryRequest
 	if err := json.Unmarshal(jsonData, &request); err != nil {
-		eh.app.log.Info("Failed to unmarshal request data: " + err.Error())
-		return DocumentQueryRequest{}, fmt.Errorf("failed to unmarshal request: %w", err)
+		eh.app.log.Info(ErrorFailedUnmarshalRequest + err.Error())
+		return DocumentQueryRequest{}, fmt.Errorf(ErrorFailedUnmarshalData, err)
 	}
 	return request, nil
 }
@@ -233,31 +233,11 @@ func (eh *EventHandler) emitDocumentQueryError(requestID, errorMsg string) {
 
 // Event emission helper functions
 func (eh *EventHandler) emitDocumentQueryProgress(progress DocumentQueryProgress) {
-	eh.app.log.Info(fmt.Sprintf("Emitting progress: %+v", progress))
-	runtime.EventsEmit(eh.app.ctx, "query-document-progress", progress)
+	eh.app.log.Info(fmt.Sprintf(LogEmittingProgress, progress))
+	runtime.EventsEmit(eh.app.ctx, EventQueryDocumentProgress, progress)
 }
 
 func (eh *EventHandler) emitDocumentQueryResponse(response DocumentQueryResponse) {
-	eh.app.log.Info(fmt.Sprintf("Emitting response: %+v", response))
-	runtime.EventsEmit(eh.app.ctx, "query-document-response", response)
-}
-
-func (app *App) saveDocumentQuestionResponse(request DocumentQueryRequest, completionResult string, processingTime int64) {
-	documentQuestionResponse := DocumentQuestionResponse{
-		ID:          bson.NewObjectID(),
-		DocumentID:  request.DocumentID,
-		IndexName:   request.IndexID,
-		EmbedPrompt: request.EmbeddingPrompt,
-		DocPrompt:   request.DocumentPrompt,
-		Response:    completionResult,
-		Keywords:    request.SearchKeywords,
-		PromptType:  request.PromptType,
-		//EmbedArgs:   request.LlamaEmbedArgs,
-		CliState:    LlamaCliArgs{},
-		CreatedAt:   time.Now(),
-		ProcessTime: processingTime,
-	}
-	if _, err := SaveDocumentQuestionResponse(app.appArgs, documentQuestionResponse); err != nil {
-		app.log.Error("Failed to save document question response: " + err.Error())
-	}
+	eh.app.log.Info(fmt.Sprintf(LogEmittingResponse, response))
+	runtime.EventsEmit(eh.app.ctx, EventQueryDocumentResponse, response)
 }

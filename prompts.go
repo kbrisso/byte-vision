@@ -78,10 +78,9 @@ func (pr *PromptRegistry) registerPrompts() {
 	pr.configs = map[string]PromptConfig{
 		"Mistral": {
 			Template: systemTemplate,
-			Data: &SystemPrompt{
-				SystemPrompt:    "",
-				UserPrompt:      "<s>[INST]You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n\r\n",
-				AssistantPrompt: "[/INST]\r\n",
+			Data: &UserPrompt{
+				UserStart: "<s>[INST]You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n\r\n",
+				UserEnd:   "[/INST]\r\n",
 			},
 		},
 		"LLAMA3": {
@@ -100,19 +99,18 @@ func (pr *PromptRegistry) registerPrompts() {
 				AssistantPrompt: "Assistant\n",
 			},
 		},
-		"UserAssistantDeepSeek": {
+		"DeepSeekQwen": {
 			Template: instTemplate,
 			Data: &UserPrompt{
-				UserStart: "<｜User｜>",
-				UserEnd:   "<｜Assistant｜>\n<think>\n</think>\n",
+				UserStart: "<｜User｜>\nuser You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
+				UserEnd:   "<｜Assistant｜>\n<think>\n\n</think>\n\n",
 			},
 		},
 		"Qwen3": {
-			Template: systemTemplate,
-			Data: &SystemPrompt{
-				SystemPrompt:    "",
-				UserPrompt:      "<|im_start|>\nuser You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
-				AssistantPrompt: "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+			Template: instTemplate,
+			Data: &UserPrompt{
+				UserStart: "<|im_start|>\nuser You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
+				UserEnd:   "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
 			},
 		},
 		"Granite": {
