@@ -209,10 +209,15 @@ export const createSettingsState = (set, get) => ({
   // Saved CLI settings
   loadSavedCliSettings: async () => {
     const { setSavedSettingsLoading, setSavedCliSettings } = get();
-
+    let result;
     try {
       setSavedSettingsLoading(true);
-      const result = await GetSavedCliSettings();
+
+      result = await GetSavedCliSettings();
+
+      if (result === "null") {
+          result = await GetDefaultSettings();
+      }
 
       let settingsData = [];
       if (typeof result === "string") {

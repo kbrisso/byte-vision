@@ -7,7 +7,10 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -94,7 +97,7 @@ func GenerateSingleCompletionWithCancel(ctx context.Context, appArgs DefaultAppA
 
 	llamaCliMutex.Lock()
 	defer llamaCliMutex.Unlock()
-
+	fmt.Println(args)
 	// Create the command with context
 	cmd := exec.CommandContext(ctx, appArgs.LLamaCliPath, args...)
 
@@ -158,4 +161,94 @@ func GenerateSingleCompletionWithCancel(ctx context.Context, appArgs DefaultAppA
 
 		return nil, ctx.Err()
 	}
+}
+func GenerateTokenCount(ctx context.Context, appArgs DefaultAppArgs, args []string) ([]byte, error) {
+	// Lock to prevent concurrent CLI calls
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	llamaCliMutex.Lock()
+	defer llamaCliMutex.Unlock()
+
+	// Create the command with context
+	cmd := exec.CommandContext(ctx, appArgs.LLamaTokenCountCliPath, args...)
+
+	// Set up process attributes for proper termination
+	if runtime.GOOS == "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			HideWindow:    true,
+			CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
+		}
+	} else {
+		// On Unix-like systems, use process group settings
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+
+	// Create a channel to capture the result
+	result := make(chan struct {
+		output []byte
+		err    error
+	})
+
+	// Run the command in a goroutine
+	go func() {
+		defer close(result)
+		out, err := cmd.Output()
+
+		select {
+		case result <- struct {
+			output []byte
+			err    error
+		}{output: out, err: err}:
+		case <-ctx.Done():
+			// Context canceled, don't send result
+		}
+	}()
+
+	select {
+	case res := <-result:
+		// Command completed normally
+		return res.output, res.err
+	case <-ctx.Done():
+		// Context was canceled - ensure process is terminated
+		if cmd.Process != nil {
+			// Use the standard Process.Kill() method which works cross-platform
+			if err := cmd.Process.Kill(); err != nil {
+				// If Kill() fails, try using Signal on Unix
+				if runtime.GOOS != "windows" {
+					cmd.Process.Signal(os.Kill)
+				}
+			}
+		}
+
+		// Wait for the process to actually terminate
+		if cmd.ProcessState == nil {
+			go func() {
+				err := cmd.Wait()
+				if err != nil {
+					return
+				} // Clean up the process
+			}()
+		}
+
+		return nil, ctx.Err()
+	}
+}
+func ExtractTokenCount(output string) (int, error) {
+	re := regexp.MustCompile(`(?i)total\s+number\s+of\s+tokens:\s*([\d,]+)`)
+	matches := re.FindAllStringSubmatch(output, -1)
+	if len(matches) == 0 {
+		return 0, fmt.Errorf("token count not found in output")
+	}
+
+	// Take the last match in case the line appears multiple times
+	raw := matches[len(matches)-1][1]
+	raw = strings.ReplaceAll(raw, ",", "")
+
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("invalid token count %q: %w", raw, err)
+	}
+	return n, nil
 }

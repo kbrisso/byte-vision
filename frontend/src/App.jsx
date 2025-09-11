@@ -8,17 +8,20 @@ import DocumentSearchForm from "./DocumentSearchForm.jsx";
 
 import "../public/main.css";
 // eslint-disable-next-line import/order
-import {useEffect} from "react";
+import { useEffect } from "react";
+import { useSettingsState } from "./StoreConfig.jsx";
 
 const App = () => {
+  const { loadSavedCliSettings } = useSettingsState();
   useEffect(() => {
     // Clear localStorage on startup
     localStorage.clear();
 
     // Or clear only your app's specific keys
-    localStorage.removeItem('byte-vision-store');
+    localStorage.removeItem("byte-vision-store");
 
-  }, []); // Empty dependency array means this runs once on mount
+    loadSavedCliSettings();
+  }, [loadSavedCliSettings]); // Empty dependency array means this runs once on mount
 
   return (
     <BrowserRouter>

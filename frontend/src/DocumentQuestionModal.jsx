@@ -29,10 +29,9 @@ const DocumentQuestionModal = ({
         indexValue,
         sourceLocation,
         cliState,
-        embState,
+        embState
     });
-
-    // Progress Message Container Component
+       // Progress Message Container Component
     const ProgressMessageContainer = ({ progressMessage, onCancel }) => {
         const [elapsedTime, setElapsedTime] = useState(0);
 
@@ -245,24 +244,35 @@ const DocumentQuestionModal = ({
       <div className="h-100 d-flex flex-column">
         <div className="flex-shrink-0 p-3 border-bottom d-flex justify-content-between align-items-center">
           <h6 className="mb-0">Query Details</h6>
-          <Button
-            variant="outline-success"
-            size="sm"
-            onClick={doc.handleExportHistoryReport}
-            disabled={doc.exportingPDF}
-          >
-            {doc.exportingPDF ? (
-              <>
-                <Spinner animation="border" size="sm" className="me-1" />
-                Exporting...
-              </>
-            ) : (
-              <>
-                <i className="bi bi-file-earmark-pdf me-1"></i>
-                Export
-              </>
-            )}
-          </Button>
+          <div className="d-flex gap-2">
+            <Button
+              variant="outline-primary"
+              size="sm"
+              onClick={doc.handleReloadHistoryToForm}
+              disabled={!doc.selectedHistoryItem}
+            >
+              <i className="bi bi-arrow-clockwise me-1"></i>
+              Reload
+            </Button>
+            <Button
+              variant="outline-success"
+              size="sm"
+              onClick={doc.handleExportHistoryReport}
+              disabled={doc.exportingPDF}
+            >
+              {doc.exportingPDF ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-1" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-file-earmark-pdf me-1"></i>
+                  Export
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="flex-grow-1 p-3 theme-scrollbar" style={{ overflowY: "auto" }}>
@@ -471,13 +481,18 @@ const DocumentQuestionModal = ({
                             <Form.Select
                               className="theme-form-control form-select"
                               value={doc.selectedDocPrompt}
-                              onChange={(e) => doc.setSelectedDocPrompt(e.target.value)}
+                              onChange={(e) => {
+                                  console.log('Dropdown onChange triggered:', e.target.value);
+                                  console.log('Current selectedDocPrompt before update:', doc.selectedDocPrompt);
+                                  doc.setSelectedDocPrompt(e.target.value);
+                                  console.log('setSelectedDocPrompt called with:', e.target.value);
+                              }}
                               required
                               size="sm"
                               style={{ fontSize: "0.85rem" }}
                             >
                               <option value="">Select a prompt</option>
-                              {Object.keys(doc.DOC_PROMPTS).map((type) => (
+                              {doc.DOC_PROMPTS && Object.keys(doc.DOC_PROMPTS).map((type) => (
                                 <option key={type} value={type}>
                                   {type}
                                 </option>
@@ -497,15 +512,15 @@ const DocumentQuestionModal = ({
                             Embedding prompt text:
                           </Form.Label>
                           <Form.Control
-                            as="textarea"
-                            rows={1}
-                            id="embeddingPrompt"
-                            value={doc.embeddingPrompt}
-                            onChange={(e) => doc.setEmbeddingPrompt(e.target.value)}
-                            placeholder="Choose an embedding prompt type..."
-                            required
-                            size="sm"
-                            style={{ fontSize: "0.85rem" }}
+                              as="textarea"
+                              rows={1}
+                              id="embeddingPrompt"
+                              value={doc.formState.embeddingPrompt}
+                              onChange={(e) => doc.updateFormField('embeddingPrompt', e.target.value)}
+                              placeholder="Choose an embedding prompt type..."
+                              required
+                              size="sm"
+                              style={{ fontSize: "0.85rem" }}
                           />
                         </div>
 
@@ -514,33 +529,32 @@ const DocumentQuestionModal = ({
                             Ask a question
                           </Form.Label>
                           <Form.Control
-                            as="textarea"
-                            id="question-input"
-                            rows={2}
-                            value={doc.question}
-                            onChange={(e) => doc.setQuestion(e.target.value)}
-                            onKeyDown={doc.handleKeyDown}
-                            placeholder="Ask a question about this document..."
-                            required
-                            size="sm"
-                            style={{ fontSize: "0.85rem" }}
+                              as="textarea"
+                              id="question-input"
+                              rows={2}
+                              value={doc.formState.documentPrompt}
+                              onChange={(e) => doc.updateFormField('documentPrompt', e.target.value)}
+                              onKeyDown={doc.handleKeyDown}
+                              placeholder="Ask a question about this document..."
+                              required
+                              size="sm"
+                              style={{ fontSize: "0.85rem" }}
                           />
                         </div>
 
                         <div className="d-flex justify-content-between align-items-center">
                           <div>
-                            <Button
-                              type="button"
-                              variant="outline-secondary"
-                              onClick={doc.clearChatHistory}
-                              disabled={doc.chatHistory.length === 0}
-                              className="me-2"
-                              size="sm"
-                              style={{ fontSize: "0.8rem" }}
-                            >
-                              <i className="bi bi-trash"></i>
-                              Clear
-                            </Button>
+                              <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={doc.clearFormAndChat}
+                                  disabled={doc.loading}
+                                  data-testid="clear-button"
+                                  className="clear-btn me-2"
+                              >
+                                  <i className="bi bi-eraser me-1"></i>
+                                  Clear
+                              </Button>
                             <Button
                               type="button"
                               variant="outline-info"

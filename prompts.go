@@ -94,7 +94,7 @@ func (pr *PromptRegistry) registerPrompts() {
 		"SystemUserAssistant": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
-				SystemPrompt:    "System You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\n Please follow these instructions:\n",
+				SystemPrompt:    "System You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
 				UserPrompt:      "User\n",
 				AssistantPrompt: "Assistant\n",
 			},
@@ -132,7 +132,7 @@ func (pr *PromptRegistry) registerPrompts() {
 		"GPTOSS": {
 			Template: instTemplate,
 			Data: NewGPTOSSPrompt(
-				"You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.",
+				"You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n",
 				"final",
 			),
 		},

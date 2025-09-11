@@ -31,14 +31,14 @@ const ChatMessage = ({
     ? `mb-2 ${isUser ? "text-end" : "text-start"}`
     : "message-item mb-3";
 
-  // Message content classes
+  // Message content classes - remove Bootstrap classes for compact mode
   const contentClasses = compact
     ? `d-inline-block p-2 rounded ${
         isUser 
           ? "bg-primary text-white" 
           : isError 
             ? "bg-danger text-white"
-            : "bg-light text-dark"
+            : "" // Remove Bootstrap classes, use custom styling below
       }`
     : "message-content flex-grow-1";
 
@@ -106,9 +106,14 @@ const ChatMessage = ({
           style={{
             maxWidth: "85%",
             fontSize: "0.9rem",
-            backgroundColor: isUser ? "var(--btn-primary-bg)" : "var(--bg-card)",
-            color: isUser ? "var(--btn-primary-text)" : "var(--text-primary)",
+            backgroundColor: isUser 
+              ? "var(--btn-primary-bg)" 
+              : "var(--bg-card)",  // Use the same background as history items
+            color: isUser 
+              ? "var(--btn-primary-text)" 
+              : "var(--text-primary)",  // Use consistent text color
             borderColor: "var(--border-secondary)",
+            border: isUser ? "none" : "1px solid var(--border-secondary)",  // Add border for non-user messages like history items
           }}
         >
           <div style={{ whiteSpace: "pre-wrap" }}>

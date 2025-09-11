@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -369,12 +370,12 @@ func (app *App) QueryElasticDocument(llamaCliArgs LlamaCliArgs, llamaEmbedArgs L
 			return app.handleEmbeddingError(err, "promptSearchVector")
 		}
 
-		keywordSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, keywordSearchVector, 60)
+		keywordSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, keywordSearchVector, 100)
 		if err != nil {
 			return app.handleSearchError(err, "keywordSearchVector")
 		}
 
-		promptSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, promptSearchVector, 60)
+		promptSearchResults, err := elasticClient.SearchDocumentByIDWithVector(app.ctx, indexID, documentID, promptSearchVector, 100)
 		if err != nil {
 			return app.handleSearchError(err, "promptSearchVector")
 		}
@@ -434,11 +435,29 @@ func (app *App) generateCompletionWithPromptType(llamaCliArgs LlamaCliArgs, llam
 		app.log.Error("Failed to save prompt: " + err.Error())
 	}
 
+	args := []string{
+		"-m", llamaCliArgs.ModelFullPathVal,
+		"-f", app.appArgs.PromptTempPath + "/" + filename,
+		"--show-count",
+		"--log-disable",
+	}
+
+	count, err := GenerateTokenCount(app.ctx, *app.appArgs, args)
+	if err != nil {
+		app.log.Error("Failed to Generate Token Count: " + err.Error())
+	}
+
+	n, err := ExtractTokenCount(string(count))
+	if err != nil {
+		app.log.Error("Failed to Extract Token Count: " + err.Error())
+	}
+
 	llamaCliArgs.PromptFileCmd = "-f"
 	llamaCliArgs.PromptFileVal = app.appArgs.PromptTempPath + "/" + filename
-	llamaCliArgs.PromptText = ""
-
+	parsedPredict, _ := strconv.Atoi(llamaCliArgs.PredictVal)
+	llamaCliArgs.CtxSizeVal = strconv.Itoa(n + parsedPredict)
 	cliArgumentsArray := LlamaCliStructToArgs(llamaCliArgs)
+
 	generatedOutput, err := GenerateSingleCompletionWithCancel(app.ctx, *app.appArgs, cliArgumentsArray)
 	if err != nil {
 		app.log.Error("Failed to generate completion: " + err.Error())

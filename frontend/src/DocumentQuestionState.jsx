@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef, useEffect, useReducer } from "react";
 import { pdf } from "@react-pdf/renderer";
 
 import {
@@ -13,8 +13,37 @@ import { CancelProcess, GetDocumentQuestionResponse} from "../wailsjs/go/main/Ap
 import { useSettingsState } from "./StoreConfig.jsx";
 import { LEGAL_KEYWORDS, DOC_PROMPTS, PDFReportDocument, PDFExportDocument } from "./CommonUtils.jsx";
 
-// Constants specific to document question functionality
+// Constants
 const DOCUMENT_SCOPE = "document";
+
+// Form state reducer
+const formStateReducer = (state, action) => {
+    switch (action.type) {
+        case 'UPDATE_FIELD':
+            return {
+                ...state,
+                [action.field]: action.value
+            };
+        case 'RESET':
+            return {
+                embeddingPrompt: "",
+                documentPrompt: "",
+                searchKeywords: []
+            };
+        case 'SET_EMBEDDING_PROMPT':
+            return {
+                ...state,
+                embeddingPrompt: action.value
+            };
+        case 'CLEAR_DOCUMENT_PROMPT':
+            return {
+                ...state,
+                documentPrompt: ""
+            };
+        default:
+            return state;
+    }
+};
 
 // Helper functions
 const generateRequestId = () =>
@@ -31,10 +60,6 @@ const formatDate = (dateValue) => {
     }
 };
 
-/**
- * Self-contained document question state management hook
- * Now uses event-driven communication with the backend
- */
 export const useDocumentQuestionState = ({
                                              show,
                                              docId,
@@ -50,33 +75,72 @@ export const useDocumentQuestionState = ({
     const [chatHistory, setChatHistory] = useState([]);
     const chatContainerRef = useRef(null);
 
-    // Keyword Selection State
-    const [selectedKeywords, setSelectedKeywords] = useState([]);
+    // Form State - SINGLE SOURCE OF TRUTH using reducer
+    const [formState, dispatchFormState] = useReducer(formStateReducer, {
+        embeddingPrompt: "",
+        documentPrompt: "",
+        searchKeywords: []
+    });
+
+    // Update form fields
+    const updateFormField = useCallback((field, value) => {
+        console.log(`Updating field ${field} to:`, value); // Debug log
+        dispatchFormState({
+            type: 'UPDATE_FIELD',
+            field,
+            value
+        });
+    }, []);
+
+    // Reset form state
+    const resetFormState = useCallback(() => {
+        dispatchFormState({ type: 'RESET' });
+    }, []);
+
+    // Validate form state
+    const validateFormState = useCallback(() => {
+        const errors = [];
+        
+        if (!formState.embeddingPrompt.trim()) {
+            errors.push("Embedding prompt is required");
+        }
+        
+        if (!formState.documentPrompt.trim()) {
+            errors.push("Document prompt is required");
+        }
+        
+        return {
+            isValid: errors.length === 0,
+            errors
+        };
+    }, [formState]);
+
+    // UI State for keyword dropdown
     const [keywordDropdownOpen, setKeywordDropdownOpen] = useState(false);
     const [hoveredOption, setHoveredOption] = useState(null);
     const multiSelectRef = useRef(null);
 
-    // Document Query State - now event-driven
+    // Document Query State
     const [progressMessage, setProgressMessage] = useState(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [currentRequestId, setCurrentRequestId] = useState(null);
 
-    // Internal document question state
-    const [question, setQuestion] = useState("");
+    // Other state
     const [loading, setLoading] = useState(false);
     const [selectedDocPrompt, setSelectedDocPrompt] = useState("");
-    const [embeddingPrompt, setEmbeddingPrompt] = useState("");
+    const setSelectedDocPromptWithLogging = useCallback((value) => {
+        setSelectedDocPrompt(value);
+    }, [selectedDocPrompt]);
     const [documentHistory, setDocumentHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
     const [leftActiveTab, setLeftActiveTab] = useState("history");
     const [exportingPDF, setExportingPDF] = useState(false);
     const [selectedHistoryId, setSelectedHistoryId] = useState(null);
     const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
-    const [eventListenersInitialized, setEventListenersInitialized] = useState(false);
 
     const eventListenersRef = useRef(false);
 
-    // Document history operations - moved up before event handlers
+    // Document history operations
     const loadDocumentHistory = useCallback(async () => {
         if (!docId) return;
 
@@ -84,8 +148,6 @@ export const useDocumentQuestionState = ({
             setHistoryLoading(true);
             LogInfo(`Loading document history for: ${docId}`);
 
-            // For history loading, we could also use events, but keeping direct call for now
-            // since it's a simpler read operation
             const response = await GetDocumentQuestionResponse(docId);
             const historyData = Array.isArray(JSON.parse(response))
                 ? JSON.parse(response)
@@ -101,30 +163,25 @@ export const useDocumentQuestionState = ({
         }
     }, [docId]);
 
-    // Event handlers for document query responses and progress - now properly ordered
+    // Event handlers for document query responses and progress
     const handleDocumentQueryResponse = useCallback((response) => {
         try {
-            // Fixed: Handle both camelCase and PascalCase variations
             const requestId = response?.requestId || response?.RequestID || response?.request_id || null;
 
-            // Reset processing state
             setIsProcessing(false);
             setCurrentRequestId(null);
             setProgressMessage(null);
             setLoading(false);
 
-            // Fixed: Handle both success field variations and ensure proper boolean conversion
             let success = false;
             if (response?.success === true || response?.Success === true) {
                 success = true;
             }
 
-            // Fixed: Handle all possible result field names
             const result = response?.result || response?.Result || response?.response || "";
             const errorMessage = response?.error || response?.Error || response?.errorMessage || "";
             const processingTime = response?.processingTime || response?.ProcessingTime || response?.processing_time || null;
 
-            // Validate successful response has content
             if (success && (!result || !result.trim())) {
                 success = false;
             }
@@ -132,7 +189,6 @@ export const useDocumentQuestionState = ({
             setChatHistory(prevHistory => {
                 const newHistory = [...prevHistory];
 
-                // Find and update the loading message
                 let loadingIndex = -1;
                 if (requestId) {
                     loadingIndex = newHistory.findIndex(
@@ -162,7 +218,6 @@ export const useDocumentQuestionState = ({
                         };
                     }
                 } else {
-                    // Add new message if no loading message found
                     if (success) {
                         newHistory.push({
                             id: Date.now() + Math.random(),
@@ -186,7 +241,6 @@ export const useDocumentQuestionState = ({
                 return newHistory;
             });
 
-            // Reload document history after successful query
             if (success) {
                 loadDocumentHistory().catch((error) => {
                     LogError(`Failed to reload document history: ${error}`);
@@ -202,10 +256,9 @@ export const useDocumentQuestionState = ({
         try {
             const currentProgress = progressData?.progress || progressData?.Progress || 0;
 
-            // Fix: Only update if progress is moving forward (prevent race conditions)
             setProgressMessage(prevProgress => {
                 if (prevProgress && prevProgress.progress > currentProgress) {
-                    return prevProgress; // Don't go backwards in progress
+                    return prevProgress;
                 }
 
                 return {
@@ -219,15 +272,14 @@ export const useDocumentQuestionState = ({
         } catch (err) {
             LogError(`Error handling document query progress: ${err?.message || err}`);
         }
-    }, [isProcessing]);
+    }, []);
 
-    // Event handling initialization - now has access to both handlers
+    // Event handling initialization
     const initializeDocumentQueryListeners = useCallback(() => {
         if (eventListenersRef.current) {
-            return; // Already initialized
+            return;
         }
 
-        // Prevent duplicates
         EventsOff("query-document-response");
         EventsOff("query-document-progress");
 
@@ -235,7 +287,6 @@ export const useDocumentQuestionState = ({
         EventsOn("query-document-progress", handleDocumentQueryProgress);
 
         eventListenersRef.current = true;
-        setEventListenersInitialized(true);
         LogInfo("Document query event listeners initialized");
     }, [handleDocumentQueryResponse, handleDocumentQueryProgress]);
 
@@ -292,24 +343,25 @@ export const useDocumentQuestionState = ({
         }
     }, [chatHistory]);
 
-    // Keyword Selection Operations
+    // Keyword Selection Operations - ALL use formState
     const handleKeywordToggle = useCallback((keyword) => {
-        setSelectedKeywords(prev =>
-            prev.includes(keyword)
-                ? prev.filter(k => k !== keyword)
-                : [...prev, keyword]
-        );
-    }, []);
+        const currentKeywords = formState.searchKeywords;
+        const newKeywords = currentKeywords.includes(keyword)
+            ? currentKeywords.filter(k => k !== keyword)
+            : [...currentKeywords, keyword];
+        updateFormField('searchKeywords', newKeywords);
+    }, [formState.searchKeywords, updateFormField]);
 
     const handleRemoveKeyword = useCallback((keywordToRemove) => {
-        setSelectedKeywords(prev => prev.filter(keyword => keyword !== keywordToRemove));
-    }, []);
+        const newKeywords = formState.searchKeywords.filter(keyword => keyword !== keywordToRemove);
+        updateFormField('searchKeywords', newKeywords);
+    }, [formState.searchKeywords, updateFormField]);
 
     const clearKeywords = useCallback(() => {
-        setSelectedKeywords([]);
+        updateFormField('searchKeywords', []);
         setKeywordDropdownOpen(false);
         setHoveredOption(null);
-    }, []);
+    }, [updateFormField]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -323,7 +375,7 @@ export const useDocumentQuestionState = ({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Document Query Operations - now event-driven
+    // Document Query Operations
     const submitQuery = useCallback(async (queryParams) => {
         if (isProcessing) {
             LogError("Query already in progress");
@@ -331,17 +383,14 @@ export const useDocumentQuestionState = ({
         }
 
         try {
-            // Initialize listeners
             initializeDocumentQueryListeners();
 
             setIsProcessing(true);
             setLoading(true);
 
-            // Generate request ID
             const requestId = generateRequestId();
             setCurrentRequestId(requestId);
 
-            // Set initial progress with startTime
             const startTime = Date.now();
             setProgressMessage({
                 status: "initializing",
@@ -357,8 +406,7 @@ export const useDocumentQuestionState = ({
                 indexId: queryParams.indexId,
             });
 
-            // Add loading message to chat
-            const loadingMessage = addMessageToChat(
+            addMessageToChat(
                 "assistant",
                 "Processing your query...",
                 true,
@@ -366,7 +414,6 @@ export const useDocumentQuestionState = ({
                 requestId
             );
 
-            // Emit the query request event
             const payload = {
                 ...queryParams,
                 requestId,
@@ -377,7 +424,6 @@ export const useDocumentQuestionState = ({
         } catch (error) {
             LogError(`Document query submission failed: ${error.message}`);
 
-            // Update any loading messages with error
             setChatHistory(prev =>
                 prev.map(msg =>
                     msg.isLoading
@@ -392,6 +438,7 @@ export const useDocumentQuestionState = ({
             setProgressMessage(null);
         }
     }, [isProcessing, initializeDocumentQueryListeners, addMessageToChat]);
+
     const handleCancel = useCallback(async () => {
         if (!isProcessing) return;
 
@@ -399,7 +446,6 @@ export const useDocumentQuestionState = ({
             LogInfo("Cancelling document query");
             await CancelProcess();
 
-            // Update any loading messages
             setChatHistory(prev =>
                 prev.map(msg =>
                     msg.isLoading
@@ -418,30 +464,20 @@ export const useDocumentQuestionState = ({
         }
     }, [isProcessing]);
 
-    // Reset state when modal opens/closes
-    useEffect(() => {
-        if (!show) {
-            clearChatHistory();
-            clearKeywords();
-            setQuestion("");
-            setSelectedDocPrompt("");
-            setEmbeddingPrompt("");
-            setDocumentHistory([]);
-            setLoading(false);
-            setLeftActiveTab("history");
-            setSelectedHistoryId(null);
-            setSelectedHistoryItem(null);
-            setExportingPDF(false);
-            setProgressMessage(null);
-            setIsProcessing(false);
-            setCurrentRequestId(null);
-        }
-    }, [show, clearChatHistory, clearKeywords]);
-
     // Update embedding prompt when doc prompt changes
     useEffect(() => {
-        const promptTemplate = selectedDocPrompt && DOC_PROMPTS[selectedDocPrompt];
-        setEmbeddingPrompt(promptTemplate || "");
+        if (selectedDocPrompt && DOC_PROMPTS[selectedDocPrompt]) {
+            const promptTemplate = DOC_PROMPTS[selectedDocPrompt];
+            dispatchFormState({
+                type: 'SET_EMBEDDING_PROMPT',
+                value: promptTemplate
+            });
+        } else {
+            dispatchFormState({
+                type: 'SET_EMBEDDING_PROMPT',
+                value: ""
+            });
+        }
     }, [selectedDocPrompt]);
 
     // Load document history when modal opens
@@ -453,82 +489,87 @@ export const useDocumentQuestionState = ({
         }
     }, [show, docId, loadDocumentHistory]);
 
-    // Form submission handler
-    const handleSubmit = useCallback(
-        async (e) => {
-            e.preventDefault();
-            if (!question.trim() || loading || isProcessing) return;
+    // Add this handleSubmit function before the return statement
+const handleSubmit = useCallback(async (e) => {
+    e.preventDefault();
+    
+    // Validate form
+    const validation = validateFormState();
+    if (!validation.isValid) {
+        LogError(`Form validation failed: ${validation.errors.join(', ')}`);
+        return;
+    }
 
-            // Validation - do this BEFORE adding message to chat
-            if (!selectedDocPrompt) {
-                LogError("Please select a prompt type");
-                return;
-            }
-            if (!embeddingPrompt.trim()) {
-                LogError("Embedding prompt is required");
-                return;
-            }
-            // Add validation for selectedPromptType from global state
-            if (!selectedPromptType) {
-                LogError("Please select a prompt type from global settings");
-                return;
-            }
+    // Check if already processing
+    if (isProcessing || loading) {
+        LogInfo("Already processing a request, ignoring submit");
+        return;
+    }
 
-            try {
-                LogInfo("Submitting document question:", {
-                    docId,
-                    question: question.substring(0, 50) + "...",
-                    selectedDocPrompt,
-                    selectedPromptType, // Log both for debugging
-                });
+    try {
+        setLoading(true);
+        setIsProcessing(true);
+        
+        const requestId = generateRequestId();
+        setCurrentRequestId(requestId);
+        
+        // Add user message to chat history
+        const userMessage = {
+            id: Date.now() + Math.random(),
+            sender: "user",
+            content: formState.documentPrompt,
+            timestamp: new Date().toISOString(),
+        };
+        
+        const loadingMessage = {
+            id: Date.now() + Math.random() + 1,
+            sender: "assistant",
+            content: "",
+            isLoading: true,
+            timestamp: new Date().toISOString(),
+            requestId,
+        };
+        
+        setChatHistory(prev => [...prev, userMessage, loadingMessage]);
+        
+        // Prepare request payload
+        const payload = {
+            requestId: requestId,
+            llamaCliArgs: cliState || {},
+            llamaEmbedArgs: embState || {},
+            indexId: indexValue,
+            documentId: docId,
+            embeddingPrompt: formState.embeddingPrompt,
+            documentPrompt: formState.documentPrompt,
+            promptType: selectedPromptType,
+            searchKeywords: formState.searchKeywords || []
+        };
+        
+        LogInfo("Submitting document query:", payload);
+        
+        // Emit the query request
+        EventsEmit("query-document-request", payload);
+        
+        // Clear the document prompt after submission
+        dispatchFormState({ type: 'CLEAR_DOCUMENT_PROMPT' });
+        
+    } catch (error) {
+        LogError(`Failed to submit query: ${error}`);
+        setLoading(false);
+        setIsProcessing(false);
+        setCurrentRequestId(null);
+        setProgressMessage(null);
+    }
+}, [formState, validateFormState, isProcessing, loading, docId, indexValue, selectedDocPrompt]);
 
-                // Add a user message only after validation passes
-                addMessageToChat("user", question);
-
-                // Submit query via events - use selectedPromptType from global state
-                await submitQuery({
-                    llamaCliArgs: cliState,
-                    llamaEmbedArgs: embState,
-                    indexId: indexValue,
-                    documentId: docId,
-                    embeddingPrompt: embeddingPrompt.trim(),
-                    documentPrompt: question.trim(),
-                    promptType: selectedPromptType, // Use global selectedPromptType instead of selectedDocPrompt
-                    searchKeywords: selectedKeywords,
-                });
-
-                // Clear question only on successful submission
-                setQuestion("");
-                LogInfo("Document question submitted successfully via events");
-            } catch (error) {
-                LogError(`Query submission failed: ${error.message}`);
-            }
-        },
-        [
-            question,
-            loading,
-            isProcessing,
-            selectedDocPrompt,
-            embeddingPrompt,
-            selectedPromptType, // Add selectedPromptType to dependencies
-            addMessageToChat,
-            submitQuery,
-            cliState,
-            embState,
-            indexValue,
-            docId,
-            selectedKeywords,
-        ]
-    );
-    // Rest of the component remains the same (keyboard handler, history selection, PDF export, etc.)
     const handleKeyDown = useCallback(
         (e) => {
-            if (e.key === "Enter" && !e.shiftKey && !loading && question.trim()) {
+            if (e.key === "Enter" && !e.shiftKey && !loading && formState.documentPrompt.trim()) {
                 e.preventDefault();
                 handleSubmit(e);
             }
         },
-        [loading, question, handleSubmit]
+        [loading, formState.documentPrompt, handleSubmit]
     );
 
     const handleSelectHistoryItem = useCallback((historyItem) => {
@@ -549,7 +590,6 @@ export const useDocumentQuestionState = ({
                 ? sourceLocation.split("/").pop() || sourceLocation.split("\\").pop()
                 : "Unknown Document";
 
-            // Convert chat history to the format expected by PDFExportDocument
             const formattedChatHistory = chatHistory.map(message => ({
                 id: message.id,
                 sender: message.sender,
@@ -577,7 +617,6 @@ export const useDocumentQuestionState = ({
             LogInfo("Chat session PDF exported successfully");
         } catch (error) {
             LogError(`PDF export failed: ${error}`);
-            LogError(`PDF export failed: ${error.message}`);
         } finally {
             setExportingPDF(false);
         }
@@ -622,7 +661,7 @@ export const useDocumentQuestionState = ({
         }
     }, [selectedHistoryItem, docId, indexValue, exportingPDF]);
 
-    // Multi-select renderer (unchanged)
+    // Multi-select renderer - uses formState consistently
     const renderMultiSelect = useCallback(() => {
         return (
             <div className="position-relative" ref={multiSelectRef}>
@@ -631,21 +670,24 @@ export const useDocumentQuestionState = ({
                     onClick={() => setKeywordDropdownOpen(!keywordDropdownOpen)}
                     style={{
                         cursor: "pointer",
-                        minHeight: "32px",
+                        height: "40px",
                         fontSize: "0.85rem",
                         backgroundColor: "var(--bg-input)",
                         borderColor: "var(--border-secondary)",
                         color: "var(--text-primary)",
+                        overflowY: "auto", // Add vertical scrollbar when content overflows
+                        overflowX: "hidden", // Hide horizontal scrollbar to prevent horizontal overflow
+
                     }}
                 >
-                    {selectedKeywords.length > 0 ? (
-                        selectedKeywords.map((keyword) => (
+                    {formState.searchKeywords.length > 0 ? (
+                        formState.searchKeywords.map((keyword) => (
                             <span
                                 key={keyword}
                                 className="badge bg-primary me-1 mb-1 d-flex align-items-center"
                                 style={{ fontSize: "0.7rem" }}
                             >
-                {keyword}
+                                {keyword}
                                 <button
                                     type="button"
                                     className="btn-close btn-close-white ms-1"
@@ -656,12 +698,12 @@ export const useDocumentQuestionState = ({
                                     }}
                                     style={{ fontSize: "0.5rem" }}
                                 />
-              </span>
+                            </span>
                         ))
                     ) : (
                         <span className="text-muted" style={{ fontSize: "0.85rem" }}>
-              Select embedding keywords related to document subject.
-            </span>
+                            Select embedding keywords related to document subject.
+                        </span>
                     )}
                     <i
                         className={`bi bi-chevron-${keywordDropdownOpen ? "up" : "down"} ms-auto`}
@@ -700,7 +742,7 @@ export const useDocumentQuestionState = ({
                                     <input
                                         type="checkbox"
                                         className="form-check-input me-2"
-                                        checked={selectedKeywords.includes(keyword)}
+                                        checked={formState.searchKeywords.includes(keyword)}
                                         onChange={() => {}}
                                         style={{ transform: "scale(0.9)" }}
                                     />
@@ -715,36 +757,93 @@ export const useDocumentQuestionState = ({
     }, [
         multiSelectRef,
         keywordDropdownOpen,
-        setKeywordDropdownOpen,
-        selectedKeywords,
-        handleRemoveKeyword,
+        formState.searchKeywords,
         hoveredOption,
-        setHoveredOption,
+        handleRemoveKeyword,
         handleKeywordToggle,
+        LEGAL_KEYWORDS,
     ]);
 
-    // Computed values
+    // Computed values - uses formState
     const isSubmitDisabled = useCallback(() => {
         return (
-            !question.trim() ||
+            !formState.documentPrompt.trim() ||
             loading ||
             !selectedDocPrompt ||
-            !embeddingPrompt.trim() ||
+            !formState.embeddingPrompt.trim() ||
             isProcessing
         );
-    }, [question, loading, selectedDocPrompt, embeddingPrompt, isProcessing]);
+    }, [formState, loading, selectedDocPrompt, isProcessing]);
+
+    // Add this new function to handle reloading historical data
+    const handleReloadHistoryToForm = useCallback(() => {
+        if (!selectedHistoryItem) {
+            LogError("No history item selected to reload");
+            return;
+        }
+
+        try {
+            LogInfo(`Reloading history item to form: ${selectedHistoryItem._id?.$oid || selectedHistoryItem._id}`);
+            
+            // Update form state with historical data
+            dispatchFormState({
+                type: 'UPDATE_FIELD',
+                field: 'embeddingPrompt',
+                value: selectedHistoryItem.embedPrompt || ""
+            });
+            
+            dispatchFormState({
+                type: 'UPDATE_FIELD',
+                field: 'documentPrompt',
+                value: selectedHistoryItem.docPrompt || ""
+            });
+            
+            dispatchFormState({
+                type: 'UPDATE_FIELD',
+                field: 'searchKeywords',
+                value: selectedHistoryItem.keywords || []
+            });
+            
+            // Set the prompt type if it exists in settings
+            if (selectedHistoryItem.promptType && setSelectedPromptType) {
+                setSelectedPromptType(selectedHistoryItem.promptType);
+            }
+            
+            // Find and set the matching document prompt template
+            if (selectedHistoryItem.promptType && DOC_PROMPTS[selectedHistoryItem.promptType]) {
+                setSelectedDocPrompt(selectedHistoryItem.promptType);
+            }
+            
+            // Switch to chat tab to show the loaded form
+            setLeftActiveTab("chat");
+            
+            LogInfo("Historical data successfully loaded to form");
+            
+        } catch (error) {
+            LogError(`Failed to reload historical data: ${error}`);
+        }
+    }, [selectedHistoryItem, setSelectedPromptType, DOC_PROMPTS, setSelectedDocPrompt, setLeftActiveTab]);
 
     // Return the complete document question state interface
     return {
-        // Form state
-        question,
-        setQuestion,
+        // Form state - Primary interface
+        formState,
+        updateFormField,
+        resetFormState,
+        validateFormState,
+
+        // Backward compatibility
+        question: formState.documentPrompt,
+        setQuestion: (value) => updateFormField('documentPrompt', value),
+        embeddingPrompt: formState.embeddingPrompt,
+        setEmbeddingPrompt: (value) => updateFormField('embeddingPrompt', value),
+        selectedKeywords: formState.searchKeywords,
+
+        // Other state
         loading,
         setLoading,
         selectedDocPrompt,
-        setSelectedDocPrompt,
-        embeddingPrompt,
-        setEmbeddingPrompt,
+        setSelectedDocPrompt: setSelectedDocPromptWithLogging,
 
         // History state
         documentHistory,
@@ -757,15 +856,14 @@ export const useDocumentQuestionState = ({
         setLeftActiveTab,
         exportingPDF,
 
-        // Chat state (consolidated from ChatHistoryManager)
+        // Chat state
         chatHistory,
         chatContainerRef,
         addMessageToChat,
         updateMessageInChat,
         clearChatHistory,
 
-        // Keyword state (consolidated from KeywordSelectionHook)
-        selectedKeywords,
+        // Keyword state
         keywordDropdownOpen,
         hoveredOption,
         multiSelectRef,
@@ -775,7 +873,7 @@ export const useDocumentQuestionState = ({
         handleRemoveKeyword,
         clearKeywords,
 
-        // Query state (now event-driven)
+        // Query state
         progressMessage,
         isProcessing,
         currentRequestId,
@@ -793,6 +891,16 @@ export const useDocumentQuestionState = ({
         // Computed
         isSubmitDisabled,
 
+        // Add a manual clear function
+        clearFormAndChat: useCallback(() => {
+            clearChatHistory();
+            clearKeywords();
+            resetFormState();
+            setSelectedDocPrompt("");
+            setSelectedHistoryId(null);
+            setSelectedHistoryItem(null);
+        }, [clearChatHistory, clearKeywords, resetFormState]),
+
         // Renderers
         renderMultiSelect,
 
@@ -807,8 +915,10 @@ export const useDocumentQuestionState = ({
         DOCUMENT_SCOPE,
         DOC_PROMPTS,
         LEGAL_KEYWORDS,
+            
+        // Add the new reload function
+        handleReloadHistoryToForm,
     };
 };
 
-// Export utility functions that might be needed elsewhere
 export { formatDate, DOCUMENT_SCOPE };

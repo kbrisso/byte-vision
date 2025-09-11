@@ -529,6 +529,7 @@ func ParseDefaultAppEnv() DefaultAppArgs {
 		PromptTempPath:               os.Getenv("PromptTempPath"),
 		LLamaCliPath:                 os.Getenv("LLamaCliPath"),
 		LLamaEmbedCliPath:            os.Getenv("LLamaEmbedCliPath"),
+		LLamaTokenCountCliPath:       os.Getenv("LLamaTokenCountCliPath"),
 		PDFToTextPath:                os.Getenv("PDFToTextPath"),
 		ModelLogPath:                 os.Getenv("ModelLogPath"),
 		DocumentPath:                 os.Getenv("DocumentPath"),
@@ -859,6 +860,7 @@ func DefaultAppStructToArgs(args DefaultAppArgs) []string {
 	addCmdValPair(args.PDFToTextPath)
 	addCmdValPair(args.LLamaCliPath)
 	addCmdValPair(args.LLamaEmbedCliPath)
+	addCmdValPair(args.LLamaTokenCountCliPath)
 	addCmdValPair(args.ModelPath)
 	addCmdValPair(args.PromptCachePath)
 	addCmdValPair(args.PromptTempPath)
@@ -1391,6 +1393,7 @@ type DefaultAppArgs struct {
 	PromptTempPath               string   `json:"PromptTempPath"`
 	LLamaCliPath                 string   `json:"LLamaCliPath"`
 	LLamaEmbedCliPath            string   `json:"LLamaEmbedCliPath"`
+	LLamaTokenCountCliPath       string   `json:"LLamaTokenCountCliPath"`
 	PDFToTextPath                string   `json:"PDFToTextPath"`
 	ModelLogPath                 string   `json:"ModelLogPath"`
 	DocumentPath                 string   `json:"DocumentPath"`
