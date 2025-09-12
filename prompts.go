@@ -86,9 +86,9 @@ func (pr *PromptRegistry) registerPrompts() {
 		"LLAMA3": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
-				SystemPrompt:    "<|begin_of_text|><|start_header_id|><|end_header_id|>You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n<|eot_id|>\n",
-				UserPrompt:      "<|start_header_id|>User<|end_header_id|>\r\n",
-				AssistantPrompt: "<|eot_id|><|start_header_id|>Assistant<|end_header_id|>\r\n",
+				SystemPrompt:    "<|start_header_id|>system<|end_header_id|>You are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n<|eot_id|>\n",
+				UserPrompt:      "<|start_header_id|>user<|end_header_id|>\r\n",
+				AssistantPrompt: "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\r\n",
 			},
 		},
 		"SystemUserAssistant": {
