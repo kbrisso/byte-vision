@@ -805,9 +805,11 @@ const handleSubmit = useCallback(async (e) => {
             });
             
             // Set the prompt type if it exists in settings
+            /**
             if (selectedHistoryItem.promptType && setSelectedPromptType) {
                 setSelectedPromptType(selectedHistoryItem.promptType);
             }
+             **/
             
             // Find and set the matching document prompt template
             if (selectedHistoryItem.promptType && DOC_PROMPTS[selectedHistoryItem.promptType]) {
@@ -822,7 +824,7 @@ const handleSubmit = useCallback(async (e) => {
         } catch (error) {
             LogError(`Failed to reload historical data: ${error}`);
         }
-    }, [selectedHistoryItem, setSelectedPromptType, DOC_PROMPTS, setSelectedDocPrompt, setLeftActiveTab]);
+    }, [selectedHistoryItem,  DOC_PROMPTS, setSelectedDocPrompt, setLeftActiveTab]);
 
     // Return the complete document question state interface
     return {

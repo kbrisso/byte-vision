@@ -13,6 +13,7 @@ export const PROMPT_TYPES = [
   "FeeForm",
   "Gemma",
   "GPTOSS",
+  "OLMO"
 ];
 
 /**
@@ -453,7 +454,40 @@ export const LEGAL_KEYWORDS = [
     "Document fraud",
     "Human trafficking",
     "Smuggling",
-    "Coyote"
+    "Coyote",
+    "Appropriation",
+    "Appropriations",
+    "Appropriations Act",
+    "Continuing resolution",
+    "CR",
+    "Omnibus appropriations",
+    "Supplemental appropriations",
+    "Budget authority",
+    "Discretionary spending",
+    "Mandatory spending",
+    "Authorization",
+    "Authorization act",
+    "Budget resolution",
+    "Spending cap",
+    "Sequestration",
+    "Earmark",
+    "Line item",
+    "Pay-as-you-go",
+    "PAYGO",
+    "Scorekeeping",
+    "Outlay",
+    "Obligation",
+    "Congressional Budget Office",
+    "CBO",
+    "Appropriations committee",
+    "Budget committee",
+    "Fiscal year",
+    "Continuing appropriations",
+    "Program level funding",
+    "Budget enforcement",
+    "Reconciliation bill",
+    "Rescission",
+    "Sequester"
 ];
 
 /**
@@ -587,7 +621,34 @@ export const DOC_PROMPTS = {
         "Analyze fair hearing requirements, notice provisions, right to counsel, and procedural due process protections in administrative and judicial proceedings.",
     "Free Speech and Expression Review":
         "Examine First Amendment protections, content-based restrictions, time-place-manner regulations, and balancing tests for speech limitations.",
-
+    // Government Appropriations & Budget Analysis (New)
+    "Appropriations Overview":
+        "Analyze the document as an appropriations or budget-related measure. Identify accounts, programs, and agencies affected; the type of funding (discretionary vs. mandatory); time limits on availability; and any notable riders or conditions on the use of funds.",
+    "Line-Item Funding Analysis":
+        "Break down the specific line-item appropriations in this document, summarizing the amount, purpose, agency or account, period of availability, and any matching or cost-sharing requirements.",
+    "Appropriations Compliance Review":
+        "Assess the document for compliance with core appropriations law principles, such as purpose, time, and amount restrictions, and flag any provisions that may raise Anti-Deficiency Act or reprogramming concerns.",
+    "Continuing Resolution Impact":
+        "Explain how this document functions as, or interacts with, a continuing resolution. Identify what funding is extended, at what rate, what programs are newly funded or excluded, and any special anomalies or exceptions.",
+    "Authorization vs Appropriation Analysis":
+        "Analyze how this document’s appropriations relate to underlying authorizing statutes, highlighting any gaps, expired authorizations, deviations from authorized amounts, or provisions that effectively create new authorizations through appropriations.",
+    "Programmatic Funding Trends":
+        "Using the information in this document, describe funding trends for the major programs and accounts it covers, including increases or decreases relative to prior levels and any stated policy rationales.",
+    "Earmark and Directed Spending Review":
+        "Identify any earmarks, congressionally directed spending, or project-specific funding in the document. Summarize the beneficiaries, purposes, and any reporting or oversight requirements associated with these items.",
+    "State and Local Government Impact":
+        "Analyze how the appropriations and conditions in this document impact state, local, tribal, or territorial governments, including pass-through funding, grant conditions, maintenance-of-effort requirements, and potential unfunded mandates.",
+// General Document Analysis (New)
+    "General Document Overview":
+        "Provide a clear, structured overview of this document, identifying its purpose, main topics, key parties, and any time-sensitive obligations or deadlines.",
+    "Key Issues and Questions":
+        "Identify the principal legal and factual issues raised in this document and propose specific questions that a practitioner or policymaker should consider.",
+    "Red Flag Screening":
+        "Scan the document for potential red flags, including ambiguous language, missing definitions, inconsistent terminology, or provisions that may create significant legal, financial, or operational risk.",
+    "Definitions and Terms Mapping":
+        "Extract and summarize defined terms and specialized terminology in this document, mapping each definition to where and how it is used in the text.",
+    "Procedural Posture Summary":
+        "Explain the procedural posture reflected in this document, including what has already happened, what is being requested, and what the next procedural steps are likely to be.",
     // Immigration Law (Expanded)
     "Deportation and Removal Analysis":
         "Analyze removal proceedings, grounds for deportation, relief from removal, and due process protections in immigration enforcement.",

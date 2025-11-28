@@ -998,8 +998,8 @@ export const LlamaCliSettingsForm = () => {
                                     {renderCheckboxField(
                                         "Flash Attention",
                                         "--flash-attn (-fa)",
-                                        "FlashAttentionCmdEnabled",
-                                        llamaCliSettings.FlashAttentionCmdEnabled,
+                                        "FlashAttentionVal",
+                                        llamaCliSettings.FlashAttentionVal,
                                         "Enable Flash Attention (default: disabled)"
                                     )}
 

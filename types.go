@@ -49,7 +49,7 @@ func ParseDefaultLlamaCliEnv() LlamaCliArgs {
 		KeepCmd:                    os.Getenv("KeepCmd"),
 		KeepVal:                    os.Getenv("KeepVal"),
 		FlashAttentionCmd:          os.Getenv("FlashAttentionCmd"),
-		FlashAttentionCmdEnabled:   getEnvBool(os.Getenv("FlashAttentionCmdEnabled"), false),
+		FlashAttentionVal:          os.Getenv("FlashAttentionVal"),
 		PromptCmd:                  os.Getenv("PromptCmd"),
 		PromptCmdEnabled:           getEnvBool(os.Getenv("PromptCmdEnabled"), false),
 		PromptText:                 os.Getenv("PromptText"),
@@ -325,7 +325,7 @@ func ParseDefaultLlamaEmbedEnv() LlamaEmbedArgs {
 		EmbedKeepCmd:                    os.Getenv("EmbedKeepCmd"),
 		EmbedKeepVal:                    os.Getenv("EmbedKeepVal"),
 		EmbedFlashAttentionCmd:          os.Getenv("EmbedFlashAttentionCmd"),
-		EmbedFlashAttentionCmdEnabled:   getEnvBool(os.Getenv("EmbedFlashAttentionCmdEnabled"), false),
+		EmbedFlashAttentionVal:          os.Getenv("EmbedFlashAttentionVal"),
 		EmbedPromptCmd:                  os.Getenv("EmbedPromptCmd"),
 		EmbedPromptCmdEnabled:           getEnvBool(os.Getenv("EmbedPromptCmdEnabled"), false),
 		EmbedPromptText:                 os.Getenv("EmbedPromptText"),
@@ -588,7 +588,7 @@ func LlamaCliStructToArgs(args LlamaCliArgs) []string {
 	addCmdValPair(args.BatchCmd, args.BatchCmdVal)
 	addCmdValPair(args.UBatchCmd, args.UBatchCmdVal)
 	addCmdValPair(args.KeepCmd, args.KeepVal)
-	addCmdBoolPair(args.FlashAttentionCmd, args.FlashAttentionCmdEnabled)
+	addCmdValPair(args.FlashAttentionCmd, args.FlashAttentionVal)
 	addCmdValPair(args.PromptCmd, args.PromptText)
 	addCmdBoolPair(args.NoPerfCmd, args.NoPerfCmdEnabled)
 	addCmdValPair(args.PromptFileCmd, args.PromptFileVal)
@@ -744,7 +744,7 @@ func LlamaEmbedStructToArgs(args LlamaEmbedArgs) []string {
 	addCmdValPair(args.EmbedBatchCmd, args.EmbedBatchVal)
 	addCmdValPair(args.EmbedUBatchCmd, args.EmbedUBatchVal)
 	addCmdValPair(args.EmbedKeepCmd, args.EmbedKeepVal)
-	addCmdBoolPair(args.EmbedFlashAttentionCmd, args.EmbedFlashAttentionCmdEnabled)
+	addCmdValPair(args.EmbedFlashAttentionCmd, args.EmbedFlashAttentionVal)
 	addCmdValPair(args.EmbedPromptCmd, args.EmbedPromptText)
 	addCmdBoolPair(args.EmbedNoPerfCmd, args.EmbedNoPerfCmdEnabled)
 	addCmdValPair(args.EmbedPromptFileCmd, args.EmbedPromptFileVal)
@@ -918,7 +918,7 @@ type LlamaCliArgs struct {
 	KeepCmd                    string `json:"KeepCmd"`
 	KeepVal                    string `json:"KeepVal"`
 	FlashAttentionCmd          string `json:"FlashAttentionCmd"`
-	FlashAttentionCmdEnabled   bool   `json:"FlashAttentionCmdEnabled"`
+	FlashAttentionVal          string `json:"FlashAttentionVal"`
 	PromptCmd                  string `json:"PromptCmd"`
 	PromptCmdEnabled           bool   `json:"PromptCmdEnabled"`
 	PromptText                 string `json:"PromptText"`
@@ -1193,7 +1193,7 @@ type LlamaEmbedArgs struct {
 	EmbedKeepCmd                    string `json:"EmbedKeepCmd"`
 	EmbedKeepVal                    string `json:"EmbedKeepVal"`
 	EmbedFlashAttentionCmd          string `json:"EmbedFlashAttentionCmd"`
-	EmbedFlashAttentionCmdEnabled   bool   `json:"EmbedFlashAttentionCmdEnabled"`
+	EmbedFlashAttentionVal          string `json:"EmbedFlashAttentionVal"`
 	EmbedPromptCmd                  string `json:"EmbedPromptCmd"`
 	EmbedPromptCmdEnabled           bool   `json:"EmbedPromptCmdEnabled"`
 	EmbedPromptText                 string `json:"EmbedPromptText"`

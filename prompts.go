@@ -91,6 +91,14 @@ func (pr *PromptRegistry) registerPrompts() {
 				AssistantPrompt: "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\r\n",
 			},
 		},
+		"OLMO": {
+			Template: systemTemplate,
+			Data: &SystemPrompt{
+				SystemPrompt:    "<|im_start|>system\r\nYou are a professional research analyst. Please format output as markdown text, don't include the markdown``` avoid excessive formatting that distracts from content.\nPlease follow these instructions:\n<|im_end|>\n",
+				UserPrompt:      "<|im_start|>user\r\n",
+				AssistantPrompt: "<|im_end|><|im_start|>assistant\r\n",
+			},
+		},
 		"SystemUserAssistant": {
 			Template: systemTemplate,
 			Data: &SystemPrompt{
